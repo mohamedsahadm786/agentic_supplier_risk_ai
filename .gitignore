@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment (IMPORTANT - don't upload venv!)
+venv/
+env/
+ENV/
+.venv/
+
+# Environment variables (CRITICAL - protects API keys!)
+.env
+.env.local
+*.env
+
+# IDE settings
+.vscode/
+.idea/
+*.swp
+
+# RAG artifacts (will be generated locally)
+rag/faiss_index/
+rag/embeddings/
+
+# Processed data (can be regenerated)
+data/processed_chunks/
+*.pkl
+*.pickle
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Distribution
+build/
+dist/
+*.egg-info/
