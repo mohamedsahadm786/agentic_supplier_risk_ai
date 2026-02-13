@@ -1,0 +1,48 @@
+# Core AI/ML Libraries
+langchain-core==0.3.21
+langchain-openai==0.2.9
+langgraph==0.2.52
+openai==1.58.1
+
+# Vector Database & Embeddings
+qdrant-client==1.12.1
+sentence-transformers==3.3.1
+
+# Database Drivers
+psycopg2-binary==2.9.10
+redis==5.2.1
+
+# API Framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.6.1
+
+# Authentication & Security
+PyJWT==2.9.0
+bcrypt==4.2.1
+python-multipart==0.0.18
+
+# Background Tasks
+celery==5.4.0
+
+# PDF Processing
+PyPDF2==3.0.1
+pdfplumber==0.11.4
+pymupdf==1.24.14
+
+# AWS SDK (for S3, RDS)
+boto3==1.35.72
+
+# Monitoring
+prometheus-client==0.21.0
+
+# Testing
+pytest==8.3.4
+pytest-asyncio==0.24.0
+httpx==0.28.1
+
+# Utilities
+python-dotenv==1.0.1
+requests==2.32.3
+aiofiles==24.1.0
