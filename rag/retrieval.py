@@ -7,7 +7,7 @@ from typing import List, Dict
 from qdrant_client import QdrantClient
 from qdrant_client.models import Filter, FieldCondition, MatchValue
 import logging
-from embeddings import get_embedding_generator
+from rag.embeddings import get_embedding_generator
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
