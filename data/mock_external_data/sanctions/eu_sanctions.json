@@ -1,0 +1,26 @@
+{
+  "list_name": "EU Consolidated Sanctions List",
+  "last_updated": "2026-02-01",
+  "entities": [
+    {
+      "name": "Sanctioned Company Ltd",
+      "type": "company",
+      "country": "Example Country",
+      "reason": "Money laundering"
+    },
+    {
+      "name": "Blocked Industries Inc",
+      "type": "company",
+      "country": "Example Country",
+      "reason": "Supporting illegal activities"
+    }
+  ],
+  "individuals": [
+    {
+      "name": "Ivan Sanctioned",
+      "type": "individual",
+      "country": "Example Country",
+      "reason": "Financial crimes"
+    }
+  ]
+}
