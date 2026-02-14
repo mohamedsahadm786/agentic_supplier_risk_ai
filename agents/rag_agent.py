@@ -11,53 +11,52 @@ from typing import List, Dict, Optional
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# Import RAG retrieval system - using query_rag directly
+# Import RAG retrieval system
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from rag.retrieval import RAGRetriever
 
-# Since we already have query_rag.py working, we'll create a simple wrapper
+
+def get_rag_retriever():
+    """Get or create RAG retriever instance - creates fresh instance each time"""
+    try:
+        # Don't use global cache - create fresh instance to avoid stale cached code
+        return RAGRetriever(top_k=5)
+    except Exception as e:
+        print(f"   ⚠️ Could not initialize RAG retriever: {str(e)}")
+        return None
+
 def search_similar_chunks(query: str, top_k: int = 5, min_score: float = 0.3) -> List[Dict]:
     """
-    Wrapper function to search Qdrant - uses existing RAG system
-    For mock testing, returns empty list (will be replaced in production)
+    Search for relevant chunks using existing RAG retrieval system
     """
     try:
-        from qdrant_client import QdrantClient
-        from rag.embeddings import get_embedding_generator
+        retriever = get_rag_retriever()
+        if retriever is None:
+            return []
         
-        # Connect to Qdrant
-        client = QdrantClient(host="localhost", port=6333)
+        # Use your existing RAGRetriever class
+        results = retriever.search(query=query, top_k=top_k)
         
-        # Get embedding model
-        embedding_model = get_embedding_generator()
+        # Filter by minimum score
+        filtered_results = [r for r in results if r.get('similarity_score', 0) >= min_score]
         
-        # Generate query embedding
-        query_embedding = embedding_model.encode(query).tolist()
-        
-        # Search in Qdrant
-        search_results = client.search(
-            collection_name="compliance_policies",
-            query_vector=query_embedding,
-            limit=top_k,
-            score_threshold=min_score
-        )
-        
-        # Format results
-        results = []
-        for result in search_results:
-            results.append({
-                "text": result.payload.get("text", ""),
+        # Convert to expected format
+        formatted_results = []
+        for result in filtered_results:
+            formatted_results.append({
+                "text": result.get("text", ""),
                 "metadata": {
-                    "document_name": result.payload.get("document_name", "Unknown"),
-                    "page_number": result.payload.get("page_number", "Unknown"),
-                    "chunk_id": result.payload.get("chunk_id", "Unknown")
+                    "document_name": result.get("document_name", "Unknown"),
+                    "page_number": result.get("chunk_index", "Unknown"),  # Using chunk_index as page
+                    "chunk_id": result.get("id", "Unknown")
                 },
-                "score": result.score
+                "score": result.get("similarity_score", 0.0)
             })
         
-        return results
+        return formatted_results
+        
     except Exception as e:
-        # If Qdrant is not running or any error, return empty for mock testing
-        print(f"   ⚠️ RAG search not available: {str(e)}")
+        print(f"   ⚠️ RAG search error: {str(e)}")
         return []
 
 # Load environment variables

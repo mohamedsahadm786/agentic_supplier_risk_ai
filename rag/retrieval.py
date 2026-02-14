@@ -7,17 +7,23 @@ from typing import List, Dict
 from qdrant_client import QdrantClient
 from qdrant_client.models import Filter, FieldCondition, MatchValue
 import logging
-from rag.embeddings import get_embedding_generator
+
+# Smart import - works both when called directly and when imported from other packages
+try:
+    from .embeddings import get_embedding_generator  # When imported from agents/
+except ImportError:
+    from embeddings import get_embedding_generator  # When run directly from rag/
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Configuration
-QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
+# Use IP address instead of hostname to avoid DNS issues
+QDRANT_HOST = os.getenv("QDRANT_HOST", "127.0.0.1")  # Changed from "localhost"
 QDRANT_PORT = int(os.getenv("QDRANT_PORT", 6333))
 COLLECTION_NAME = "compliance_policies"
-DEFAULT_TOP_K = 5  # Number of chunks to retrieve
+DEFAULT_TOP_K = 3  # Number of chunks to retrieve
 
 
 class RAGRetriever:
@@ -30,7 +36,8 @@ class RAGRetriever:
         Args:
             top_k: Number of most relevant chunks to retrieve
         """
-        self.client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+        # Hardcode connection to avoid environment variable caching issues
+        self.client = QdrantClient(host="127.0.0.1", port=6333)
         self.embedding_generator = get_embedding_generator()
         self.collection_name = COLLECTION_NAME
         self.top_k = top_k
