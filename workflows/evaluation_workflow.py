@@ -368,3 +368,48 @@ if __name__ == "__main__":
     print("\n" + "=" * 70)
     print("✅ WORKFLOW READY FOR PRODUCTION")
     print("=" * 70)
+
+
+# ============================================
+# WRAPPER FUNCTION FOR API INTEGRATION
+# ============================================
+
+def run_evaluation(supplier_info: dict) -> dict:
+    """
+    Wrapper function for API integration.
+    Creates workflow instance and runs evaluation.
+    
+    Args:
+        supplier_info: Dictionary with keys:
+            - supplier_name (str)
+            - country (str) 
+            - registration_number (str, optional)
+            - business_context (str, optional)
+    
+    Returns:
+        dict: Final evaluation state with decision
+    
+    Example:
+        >>> info = {
+        ...     "supplier_name": "TechTextiles Ltd",
+        ...     "country": "United Kingdom",
+        ...     "registration_number": "12345678",
+        ...     "business_context": "Textile manufacturing"
+        ... }
+        >>> result = run_evaluation(info)
+        >>> print(result["final_decision"]["risk_level"])
+    """
+    # Create workflow instance
+    workflow = SupplierEvaluationWorkflow()
+    
+    # Run evaluation
+    result = workflow.evaluate_supplier(
+        supplier_name=supplier_info.get("supplier_name"),
+        supplier_country=supplier_info.get("country"),
+        document_paths=supplier_info.get("document_paths", []),
+        business_context=supplier_info.get("business_context"),
+        registration_number=supplier_info.get("registration_number"),
+        owner_names=supplier_info.get("owner_names", [])
+    )
+    
+    return result

@@ -46,3 +46,15 @@ httpx==0.28.1
 python-dotenv==1.0.1
 requests==2.32.3
 aiofiles==24.1.0
+
+# Database ORM
+sqlalchemy==2.0.36
+
+# Password Hashing (already have bcrypt, but need passlib for context)
+passlib==1.7.4
+
+# JWT Token Handling (already have PyJWT, but need python-jose for FastAPI)
+python-jose[cryptography]==3.3.0
+
+
+email-validator==2.2.0
