@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import SupplierCreate, SupplierResponse
 from ..middleware import get_current_user
+from uuid import UUID
 
 # Create router (like a mini-app for supplier routes)
 router = APIRouter()
@@ -187,7 +188,7 @@ async def get_suppliers(
 
 @router.get("/{supplier_id}", response_model=SupplierResponse)
 async def get_supplier(
-    supplier_id: int,
+    supplier_id: UUID,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
@@ -231,7 +232,7 @@ async def get_supplier(
 
 @router.put("/{supplier_id}", response_model=SupplierResponse)
 async def update_supplier(
-    supplier_id: int,
+    supplier_id: UUID,
     supplier_data: SupplierCreate,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
@@ -304,7 +305,7 @@ async def update_supplier(
 
 @router.delete("/{supplier_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_supplier(
-    supplier_id: int,
+    supplier_id: UUID,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):

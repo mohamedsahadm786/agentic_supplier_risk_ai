@@ -12,6 +12,7 @@ To run this server:
 """
 
 from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File
+
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
@@ -43,13 +44,16 @@ except ImportError as e:
 # CREATE FASTAPI APP
 # ============================================
 
+
 app = FastAPI(
     title="Supplier Risk Intelligence API",
     description="Multi-agent AI system for automated supplier risk assessment",
     version="1.0.0",
-    docs_url="/docs",  # Swagger UI documentation
-    redoc_url="/redoc"  # ReDoc documentation
+    docs_url="/docs",
+    redoc_url="/redoc"
 )
+
+
 
 
 # ============================================
@@ -311,10 +315,12 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
 
     
     return TokenResponse(access_token=token)
-
+    
 
 @app.get("/auth/me", tags=["Authentication"])
 async def get_current_user_info(current_user: dict = Depends(get_current_user)):
+
+
     """
     Get current logged-in user information.
     

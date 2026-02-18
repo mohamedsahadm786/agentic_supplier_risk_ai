@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import EvaluationCreate, EvaluationResponse
 from ..middleware import get_current_user
+from uuid import UUID
 
 # Import the LangGraph workflow with error handling
 try:
@@ -70,27 +71,38 @@ async def create_evaluation(
         )
     
     # Create evaluation record with status="processing"
+    # Create evaluation record with status="pending"
     result = db.execute(
         text(
         """
         INSERT INTO evaluations (
-            company_id, supplier_id, status, business_context,
-            created_at, updated_at
+            company_id,
+            supplier_id,
+            user_id,
+            business_context,
+            status,
+            created_at
         )
         VALUES (
-            :company_id, :supplier_id, 'processing', :business_context,
-            NOW(), NOW()
+            :company_id,
+            :supplier_id,
+            :user_id,
+            :business_context,
+            'pending',
+            NOW()
         )
-        RETURNING evaluation_id, supplier_id, status, business_context,
-                  created_at, updated_at
+        RETURNING evaluation_id, supplier_id, status,
+                business_context, created_at
         """
         ),
         {
             "company_id": company_id,
             "supplier_id": evaluation_data.supplier_id,
+            "user_id": current_user["user_id"],
             "business_context": evaluation_data.business_context
         }
     )
+
     
     evaluation = result.fetchone()
     db.commit()
@@ -133,7 +145,7 @@ async def create_evaluation(
 # ============================================
 
 def run_evaluation_background(
-    evaluation_id: int,
+    evaluation_id: UUID,
     supplier_name: str,
     country: str,
     registration_number: Optional[str],
@@ -171,8 +183,12 @@ def run_evaluation_background(
         final_state = run_evaluation(supplier_info)
         
         decision_output = final_state.get("decision_output", {})
+        risk_level = decision_output.get("risk_level")
+
+        if risk_level not in ["Low", "Medium", "High"]:
+            risk_level = None
         
-        risk_level = decision_output.get("risk_level", "Unknown")
+
         confidence_score = decision_output.get("confidence_score", 0.0)
         reasoning = decision_output.get("reasoning", "No reasoning available")
         recommended_actions = decision_output.get("recommended_actions", [])
@@ -256,7 +272,7 @@ def run_evaluation_background(
 # BACKGROUND TASK: RUN MOCK EVALUATION (FALLBACK)
 # ============================================
 
-def run_mock_evaluation(evaluation_id: int):
+def run_mock_evaluation(evaluation_id: UUID):
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     import os
@@ -352,7 +368,7 @@ def run_mock_evaluation(evaluation_id: int):
 
 @router.get("/", response_model=List[EvaluationResponse])
 async def get_evaluations(
-    supplier_id: Optional[int] = None,
+    supplier_id: Optional[UUID] = None,
     status: Optional[str] = None,
     risk_level: Optional[str] = None,
     limit: int = 100,
@@ -392,9 +408,9 @@ async def get_evaluations(
             risk_level=e.risk_level,
             confidence_score=e.confidence_score,
             reasoning=e.reasoning,
-            recommended_actions=json.loads(e.recommended_actions) if e.recommended_actions else None,
-            risk_factors=json.loads(e.risk_factors) if e.risk_factors else None,
-            agent_outputs=json.loads(e.agent_outputs) if e.agent_outputs else None,
+            recommended_actions=e.recommended_actions,
+            risk_factors=e.risk_factors,
+            agent_outputs=e.agent_outputs,
             openai_cost_usd=e.openai_cost_usd,
             created_at=e.created_at,
             completed_at=e.completed_at
@@ -409,7 +425,7 @@ async def get_evaluations(
 
 @router.get("/{evaluation_id}", response_model=EvaluationResponse)
 async def get_evaluation(
-    evaluation_id: int,
+    evaluation_id: UUID,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
@@ -440,9 +456,9 @@ async def get_evaluation(
         risk_level=evaluation.risk_level,
         confidence_score=evaluation.confidence_score,
         reasoning=evaluation.reasoning,
-        recommended_actions=json.loads(evaluation.recommended_actions) if evaluation.recommended_actions else None,
-        risk_factors=json.loads(evaluation.risk_factors) if evaluation.risk_factors else None,
-        agent_outputs=json.loads(evaluation.agent_outputs) if evaluation.agent_outputs else None,
+        recommended_actions=evaluation.recommended_actions,
+        risk_factors=evaluation.risk_factors,
+        agent_outputs=evaluation.agent_outputs,
         openai_cost_usd=evaluation.openai_cost_usd,
         created_at=evaluation.created_at,
         completed_at=evaluation.completed_at

@@ -48,23 +48,40 @@ CREATE TABLE suppliers (
     UNIQUE(company_id, supplier_name, country)
 );
 
+
 -- Table 4: Evaluations (MAIN - Audit Trail)
 CREATE TABLE evaluations (
     evaluation_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     supplier_id UUID NOT NULL REFERENCES suppliers(supplier_id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE SET NULL,
     company_id UUID NOT NULL REFERENCES companies(company_id) ON DELETE CASCADE,
-    risk_level VARCHAR(50) NOT NULL CHECK (risk_level IN ('Low', 'Medium', 'High')),
-    confidence_score DECIMAL(3, 2) CHECK (confidence_score BETWEEN 0 AND 1),
-    reasoning TEXT NOT NULL,
+
+    business_context TEXT,
+
+    risk_level VARCHAR(50)
+        CHECK (
+            risk_level IS NULL
+            OR risk_level IN ('Low', 'Medium', 'High')
+        ),
+
+    confidence_score DECIMAL(3, 2)
+        CHECK (confidence_score BETWEEN 0 AND 1),
+
+    reasoning TEXT,
     recommended_actions JSONB,
-    agent_outputs JSONB NOT NULL,
+    risk_factors JSONB,
+    agent_outputs JSONB,
+
     evaluation_duration_seconds INTEGER,
     openai_api_calls INTEGER DEFAULT 0,
     openai_cost_usd DECIMAL(10, 4) DEFAULT 0.0000,
-    status VARCHAR(50) DEFAULT 'completed' CHECK (status IN ('pending', 'in_progress', 'completed', 'failed')),
+
+    status VARCHAR(50) DEFAULT 'pending'
+        CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+
     error_message TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     completed_at TIMESTAMP
 );
 

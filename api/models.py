@@ -11,6 +11,7 @@ If required fields are missing, Pydantic will reject the data automatically.
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
 from datetime import datetime
+from uuid import UUID
 
 # ============================================
 # AUTHENTICATION MODELS
@@ -90,7 +91,7 @@ class SupplierResponse(BaseModel):
     Response when retrieving supplier information.
     Includes all supplier data plus database-generated fields.
     """
-    supplier_id: int
+    supplier_id: UUID
     supplier_name: str
     country: str
     registration_number: Optional[str]
@@ -118,9 +119,9 @@ class EvaluationCreate(BaseModel):
         "document_ids": [456, 789]  // IDs of uploaded PDFs
     }
     """
-    supplier_id: int
+    supplier_id: UUID
     business_context: str = Field(..., min_length=10)
-    document_ids: List[int] = []  # List of uploaded document IDs
+    document_ids: List[UUID] = []  # List of uploaded document IDs
 
 
 class EvaluationResponse(BaseModel):
@@ -128,8 +129,8 @@ class EvaluationResponse(BaseModel):
     Response after evaluation completes.
     Contains the full risk assessment.
     """
-    evaluation_id: int
-    supplier_id: int
+    evaluation_id: UUID
+    supplier_id: UUID
     status: str  # "pending", "processing", "completed", "failed"
     risk_level: Optional[str]  # Low, Medium, High
     confidence_score: Optional[float]  # 0.0 to 1.0
