@@ -154,7 +154,7 @@ class DocumentUploadResponse(BaseModel):
     """
     Response after a document is uploaded to MinIO.
     """
-    document_id: int
+    document_id: UUID
     file_name: str
     file_path: str  # Path in MinIO storage
     file_size_bytes: int

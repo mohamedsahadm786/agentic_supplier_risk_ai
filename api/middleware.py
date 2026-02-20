@@ -53,13 +53,28 @@ def get_current_user_optional(request: Request) -> Optional[dict]:
 # ROLE-BASED ACCESS CONTROL
 # ============================================
 
-def require_role(required_role: str):
+
+# ============================================
+# ROLE-BASED ACCESS CONTROL
+# ============================================
+
+def require_role(allowed_roles: list):
+    """
+    Allows access only if user's role is in allowed_roles list.
+    
+    Example:
+        Depends(require_role(["admin", "analyst"]))
+    """
+
     def role_checker(user: dict = Depends(get_current_user)):
-        if user.get("role") != required_role:
+        user_role = user.get("role")
+
+        if user_role not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"This action requires '{required_role}' role"
+                detail=f"Access denied. Allowed roles: {allowed_roles}"
             )
+
         return user
 
     return role_checker

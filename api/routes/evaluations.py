@@ -19,13 +19,13 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import EvaluationCreate, EvaluationResponse
-from ..middleware import get_current_user
+from ..middleware import get_current_user, require_role
 from uuid import UUID
 
 # Import the LangGraph workflow with error handling
 try:
     from workflows.evaluation_workflow import run_evaluation
-    WORKFLOW_AVAILABLE = True
+    WORKFLOW_AVAILABLE = False
 except ImportError as e:
     print(f"⚠️ Warning: Could not import evaluation workflow: {e}")
     print("   Evaluation creation will return mock data instead of running real agents.")
@@ -45,7 +45,8 @@ async def create_evaluation(
     evaluation_data: EvaluationCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_role(["admin", "analyst"]))
+
 ):
     """
     Create a new supplier risk evaluation.
@@ -107,6 +108,52 @@ async def create_evaluation(
     evaluation = result.fetchone()
     db.commit()
     evaluation_id = evaluation.evaluation_id
+
+    # ============================================
+    # LINK DOCUMENTS TO THIS EVALUATION
+    # ============================================
+
+    document_paths = []
+
+    if evaluation_data.document_ids:
+
+        # Verify documents belong to supplier and company
+        documents = db.execute(
+            text("""
+                SELECT document_id, file_path
+                FROM documents
+                WHERE document_id = ANY(:document_ids)
+                AND supplier_id = :supplier_id
+            """),
+            {
+                "document_ids": evaluation_data.document_ids,
+                "supplier_id": evaluation_data.supplier_id
+            }
+        ).fetchall()
+
+        if len(documents) != len(evaluation_data.document_ids):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="One or more documents are invalid or do not belong to this supplier"
+            )
+
+        # Update documents with evaluation_id
+        db.execute(
+            text("""
+                UPDATE documents
+                SET evaluation_id = :evaluation_id
+                WHERE document_id = ANY(:document_ids)
+            """),
+            {
+                "evaluation_id": evaluation_id,
+                "document_ids": evaluation_data.document_ids
+            }
+        )
+
+        db.commit()
+
+        # Extract file paths
+        document_paths = [doc.file_path for doc in documents]
     
     # Add background task to run the evaluation workflow
     if WORKFLOW_AVAILABLE:
@@ -116,7 +163,9 @@ async def create_evaluation(
             supplier_name=supplier.supplier_name,
             country=supplier.country,
             registration_number=supplier.registration_number,
-            business_context=evaluation_data.business_context
+            business_context=evaluation_data.business_context,
+            document_paths=document_paths,
+            user_id=current_user["user_id"]
         )
     else:
         background_tasks.add_task(
@@ -149,7 +198,9 @@ def run_evaluation_background(
     supplier_name: str,
     country: str,
     registration_number: Optional[str],
-    business_context: str
+    business_context: str,
+    document_paths: list,
+    user_id: UUID
 ):
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
@@ -176,23 +227,25 @@ def run_evaluation_background(
             "supplier_name": supplier_name,
             "country": country,
             "registration_number": registration_number or "Not provided",
-            "business_context": business_context
+            "business_context": business_context,
+            "document_paths": document_paths
         }
         
         print(f"   Running 5-agent workflow...")
         final_state = run_evaluation(supplier_info)
         
-        decision_output = final_state.get("decision_output", {})
-        risk_level = decision_output.get("risk_level")
+        # Extract final decision correctly
+        final_decision = final_state.get("final_decision", {})
+
+        risk_level = final_decision.get("risk_level")
 
         if risk_level not in ["Low", "Medium", "High"]:
             risk_level = None
-        
 
-        confidence_score = decision_output.get("confidence_score", 0.0)
-        reasoning = decision_output.get("reasoning", "No reasoning available")
-        recommended_actions = decision_output.get("recommended_actions", [])
-        risk_factors = decision_output.get("risk_factors", {})
+        confidence_score = final_decision.get("confidence_score", 0.0)
+        reasoning = final_decision.get("reasoning", "No reasoning available")
+        recommended_actions = final_decision.get("recommended_actions", [])
+        risk_factors = final_decision.get("risk_factors", {})
         
         openai_cost = 0.05
         
@@ -240,6 +293,53 @@ def run_evaluation_background(
             {"risk_level": risk_level, "evaluation_id": evaluation_id}
         )
         db.commit()
+        # ============================================
+        # INSERT NOTIFICATION RECORD
+        # ============================================
+
+        # Fetch user email
+        user_record = db.execute(
+            text("""
+                SELECT email FROM users
+                WHERE user_id = :user_id
+            """),
+            {"user_id": user_id}
+        ).fetchone()
+
+        recipient_email = user_record.email if user_record else None
+
+        if recipient_email:
+            db.execute(
+                text("""
+                    INSERT INTO notifications (
+                        user_id,
+                        evaluation_id,
+                        notification_type,
+                        recipient,
+                        subject,
+                        message,
+                        status
+                    )
+                    VALUES (
+                        :user_id,
+                        :evaluation_id,
+                        'email',
+                        :recipient,
+                        :subject,
+                        :message,
+                        'pending'
+                    )
+                """),
+                {
+                    "user_id": user_id,
+                    "evaluation_id": evaluation_id,
+                    "recipient": recipient_email,
+                    "subject": "Supplier Evaluation Completed",
+                    "message": f"Your evaluation {evaluation_id} has completed.",
+                }
+            )
+            db.commit()
+        
         
         print(f"✅ Evaluation {evaluation_id} completed successfully!")
         
@@ -335,6 +435,64 @@ def run_mock_evaluation(evaluation_id: UUID):
             }
         )
         db.commit()
+
+        # ============================================
+        # INSERT NOTIFICATION RECORD (MOCK MODE)
+        # ============================================
+
+        # Fetch user_id from evaluation
+        eval_record = db.execute(
+            text("""
+                SELECT user_id FROM evaluations
+                WHERE evaluation_id = :evaluation_id
+            """),
+            {"evaluation_id": evaluation_id}
+        ).fetchone()
+
+        if eval_record:
+            user_id = eval_record.user_id
+
+            user_record = db.execute(
+                text("""
+                    SELECT email FROM users
+                    WHERE user_id = :user_id
+                """),
+                {"user_id": user_id}
+            ).fetchone()
+
+            recipient_email = user_record.email if user_record else None
+
+            if recipient_email:
+                db.execute(
+                    text("""
+                        INSERT INTO notifications (
+                            user_id,
+                            evaluation_id,
+                            notification_type,
+                            recipient,
+                            subject,
+                            message,
+                            status
+                        )
+                        VALUES (
+                            :user_id,
+                            :evaluation_id,
+                            'email',
+                            :recipient,
+                            :subject,
+                            :message,
+                            'pending'
+                        )
+                    """),
+                    {
+                        "user_id": user_id,
+                        "evaluation_id": evaluation_id,
+                        "recipient": recipient_email,
+                        "subject": "Supplier Evaluation Completed (Mock)",
+                        "message": f"Your evaluation {evaluation_id} has completed (mock mode)."
+                    }
+                )
+                db.commit()
         
         print(f"✅ Mock evaluation {evaluation_id} completed")
         

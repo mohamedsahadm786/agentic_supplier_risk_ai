@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import SupplierCreate, SupplierResponse
-from ..middleware import get_current_user
+from ..middleware import get_current_user, require_role
 from uuid import UUID
 
 # Create router (like a mini-app for supplier routes)
@@ -33,7 +33,8 @@ router = APIRouter()
 async def create_supplier(
     supplier_data: SupplierCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_role(["admin", "analyst"]))
+   
 ):
     """
     Create a new supplier in the system.

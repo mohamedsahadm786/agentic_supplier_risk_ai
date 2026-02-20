@@ -34,11 +34,15 @@ from .middleware import get_current_user
 
 # Import routes
 try:
-    from .routes import suppliers, evaluations
+    from .routes import suppliers, evaluations, documents, notifications, users
 except ImportError as e:
     print(f"⚠️ Warning: Could not import routes: {e}")
     suppliers = None
     evaluations = None
+    documents = None
+    notifications = None
+    users = None
+
 
 # ============================================
 # CREATE FASTAPI APP
@@ -184,6 +188,11 @@ async def signup(user_data: UserSignup, db: Session = Depends(get_db)):
     # Step 1: Check if company already exists
     # ---------------------------------------------------
 
+
+    # ---------------------------------------------------
+    # Determine company and role assignment
+    # ---------------------------------------------------
+
     company = db.execute(
         text("SELECT company_id FROM companies WHERE company_name = :company_name"),
         {"company_name": user_data.company_name}
@@ -191,6 +200,7 @@ async def signup(user_data: UserSignup, db: Session = Depends(get_db)):
 
     if company:
         company_id = company[0]
+        assigned_role = "analyst"   # Existing company → analyst
     else:
         # Create new company
         company_result = db.execute(
@@ -203,8 +213,13 @@ async def signup(user_data: UserSignup, db: Session = Depends(get_db)):
         )
         company_id = company_result.fetchone()[0]
         db.commit()
-    
+
+        assigned_role = "admin"  # First user becomes admin
+
+    # ---------------------------------------------------
     # Create user
+    # ---------------------------------------------------
+
     user_result = db.execute(
         text("""
         INSERT INTO users (
@@ -222,7 +237,7 @@ async def signup(user_data: UserSignup, db: Session = Depends(get_db)):
             :full_name,
             :email,
             :password_hash,
-            'admin',
+            :role,
             TRUE,
             NOW(),
             NOW()
@@ -233,12 +248,15 @@ async def signup(user_data: UserSignup, db: Session = Depends(get_db)):
             "company_id": company_id,
             "full_name": user_data.full_name,
             "email": user_data.email,
-            "password_hash": hashed_password
+            "password_hash": hashed_password,
+            "role": assigned_role
         }
     )
 
     user_id = user_result.fetchone()[0]
     db.commit()
+
+    
     
     # Generate JWT token
     token = create_access_token(
@@ -246,7 +264,7 @@ async def signup(user_data: UserSignup, db: Session = Depends(get_db)):
             "user_id": str(user_id),        # ✅ Convert UUID to string
             "email": user_data.email,
             "company_id": str(company_id),  # ✅ Convert UUID to string
-            "role": "admin"
+            "role": assigned_role
         }
     )
 
@@ -357,6 +375,27 @@ if evaluations is not None:
         tags=["Evaluations"]
     )
 
+if documents is not None:
+    app.include_router(
+        documents.router,
+        prefix="/api/documents",
+        tags=["Documents"]
+    )
+
+if notifications is not None:
+    app.include_router(
+        notifications.router,
+        prefix="/api/notifications",
+        tags=["Notifications"]
+    )
+
+
+if users is not None:
+    app.include_router(
+        users.router,
+        prefix="/api/users",
+        tags=["Users"]
+    )
 
 # ============================================
 # ERROR HANDLERS
