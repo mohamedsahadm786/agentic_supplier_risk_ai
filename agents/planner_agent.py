@@ -5,13 +5,9 @@ Does NOT: Read documents, call tools, or make decisions
 Technology: OpenAI GPT-4
 """
 
-import os
 from typing import List, Dict
-from openai import OpenAI
-from dotenv import load_dotenv
 
-# Load environment variables (like OPENAI_API_KEY)
-load_dotenv()
+
 
 
 class PlannerAgent:
@@ -23,27 +19,21 @@ class PlannerAgent:
     - Breaks it into specific tasks
     - Doesn't do the tasks itself, just plans them
     """
-    
-    def __init__(self):
+
+    def __init__(self, db, company_id, evaluation_id):
         """
-        Initialize the Planner Agent
-        Sets up OpenAI API connection
+        Initialize Planner Agent with DB + context.
         """
-        # Get API key from environment variable
-        api_key = os.getenv("OPENAI_API_KEY")
-        
-        if not api_key:
-            raise ValueError(
-                "❌ OPENAI_API_KEY not found! "
-                "Make sure your .env file has: OPENAI_API_KEY=sk-..."
-            )
-        
-        # Create OpenAI client
-        self.client = OpenAI(api_key=api_key)
-        self.model = "gpt-4o-mini"  # Using GPT-4o-mini (cheaper and faster than GPT-4)
-        
-        print("✅ Planner Agent initialized successfully")
-    
+
+        from api.services.llm_service import LLMService
+
+        self.db = db
+        self.company_id = company_id
+        self.evaluation_id = evaluation_id
+        self.llm = LLMService(db)
+
+        print("✅ Planner Agent initialized (LLM centralized)")
+
     
     def create_evaluation_plan(
         self, 
@@ -112,19 +102,27 @@ Country: {supplier_country}"""
         
         try:
             # Call OpenAI API
-            response = self.client.chat.completions.create(
-                model=self.model,
+            response = self.llm.invoke(
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
                 ],
-                temperature=0.7,  # Some creativity in planning
-                response_format={"type": "json_object"}  # Force JSON response
+                company_id=self.company_id,
+                evaluation_id=self.evaluation_id,
+                agent_name="planner_agent",
+                response_format={"type": "json_object"},
+                temperature=0.7
             )
+
+
+
+            
             
             # Extract the plan from response
             import json
-            plan = json.loads(response.choices[0].message.content)
+            plan = json.loads(response["content"])
+            
+            
             
             # Print the plan for visibility
             print(f"✅ Plan created with {len(plan.get('tasks', []))} tasks")

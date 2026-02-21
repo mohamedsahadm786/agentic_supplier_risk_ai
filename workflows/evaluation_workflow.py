@@ -55,25 +55,56 @@ class SupplierEvaluationWorkflow:
     Main workflow orchestrator
     Runs all 5 agents in sequence
     """
-    
-    def __init__(self):
+    def __init__(self, db, company_id, evaluation_id):
         """
-        Initialize workflow and all agents
+        Initialize workflow with DB + context
         """
+
         print("🔧 Initializing Supplier Evaluation Workflow...")
-        
-        # Initialize all 5 agents
-        self.planner = PlannerAgent()
-        self.document_agent = DocumentAgent()
-        self.rag_agent = RAGAgent()
-        self.external_agent = ExternalAgent()
-        self.decision_agent = DecisionAgent()
-        
-        # Build the workflow graph
+
+        self.db = db
+        self.company_id = company_id
+        self.evaluation_id = evaluation_id
+
+        # Initialize PlannerAgent with centralized LLM
+        self.planner = PlannerAgent(
+            db=self.db,
+            company_id=self.company_id,
+            evaluation_id=self.evaluation_id
+        )
+
+        # Initialize all agents with centralized LLM context
+
+        self.document_agent = DocumentAgent(
+            db=self.db,
+            company_id=self.company_id,
+            evaluation_id=self.evaluation_id
+        )
+
+        self.rag_agent = RAGAgent(
+            db=self.db,
+            company_id=self.company_id,
+            evaluation_id=self.evaluation_id
+        )
+
+        self.external_agent = ExternalAgent(
+            db=self.db,
+            company_id=self.company_id,
+            evaluation_id=self.evaluation_id
+        )
+
+        self.decision_agent = DecisionAgent(
+            db=self.db,
+            company_id=self.company_id,
+            evaluation_id=self.evaluation_id
+        )
+
+
         self.workflow = self._build_workflow()
-        
+
         print("✅ Workflow initialized successfully")
         print("   All 5 agents ready")
+    
     
     
     def _build_workflow(self) -> StateGraph:
@@ -358,7 +389,7 @@ if __name__ == "__main__":
     print("=" * 70)
     
     try:
-        workflow = SupplierEvaluationWorkflow()
+        workflow = SupplierEvaluationWorkflow(db, company_id, evaluation_id)
         print("\n✅ Workflow initialized successfully!")
         print("   All 5 agents loaded and ready")
     except Exception as e:
@@ -373,35 +404,24 @@ if __name__ == "__main__":
 # ============================================
 # WRAPPER FUNCTION FOR API INTEGRATION
 # ============================================
-
-def run_evaluation(supplier_info: dict) -> dict:
+def run_evaluation(
+    supplier_info: dict,
+    db,
+    company_id,
+    evaluation_id
+) -> dict:
     """
     Wrapper function for API integration.
     Creates workflow instance and runs evaluation.
-    
-    Args:
-        supplier_info: Dictionary with keys:
-            - supplier_name (str)
-            - country (str) 
-            - registration_number (str, optional)
-            - business_context (str, optional)
-    
-    Returns:
-        dict: Final evaluation state with decision
-    
-    Example:
-        >>> info = {
-        ...     "supplier_name": "TechTextiles Ltd",
-        ...     "country": "United Kingdom",
-        ...     "registration_number": "12345678",
-        ...     "business_context": "Textile manufacturing"
-        ... }
-        >>> result = run_evaluation(info)
-        >>> print(result["final_decision"]["risk_level"])
     """
-    # Create workflow instance
-    workflow = SupplierEvaluationWorkflow()
-    
+
+    # Create workflow instance with context
+    workflow = SupplierEvaluationWorkflow(
+        db=db,
+        company_id=company_id,
+        evaluation_id=evaluation_id
+    )
+
     # Run evaluation
     result = workflow.evaluate_supplier(
         supplier_name=supplier_info.get("supplier_name"),
@@ -411,5 +431,6 @@ def run_evaluation(supplier_info: dict) -> dict:
         registration_number=supplier_info.get("registration_number"),
         owner_names=supplier_info.get("owner_names", [])
     )
-    
+
     return result
+

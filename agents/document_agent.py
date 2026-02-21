@@ -8,16 +8,13 @@ Technology: PyPDF2/pdfplumber + OpenAI GPT-4
 import os
 import json
 from typing import List, Dict, Optional
-from openai import OpenAI
-from dotenv import load_dotenv
 
 # Import MCP-1 Document Tools
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from mcp_tools.document_tools import read_pdf, extract_tables
 
-# Load environment variables
-load_dotenv()
+
 
 
 class DocumentAgent:
@@ -32,23 +29,17 @@ class DocumentAgent:
     - Does NOT make decisions - just reports facts
     """
     
-    def __init__(self):
+    def __init__(self, db, company_id, evaluation_id):
         """
         Initialize the Document Intelligence Agent
         Sets up OpenAI API connection
         """
-        # Get API key from environment variable
-        api_key = os.getenv("OPENAI_API_KEY")
-        
-        if not api_key:
-            raise ValueError(
-                "❌ OPENAI_API_KEY not found! "
-                "Make sure your .env file has: OPENAI_API_KEY=sk-..."
-            )
-        
-        # Create OpenAI client
-        self.client = OpenAI(api_key=api_key)
-        self.model = "gpt-4o-mini"  # Using GPT-4o-mini for cost efficiency
+        from api.services.llm_service import LLMService
+
+        self.llm = LLMService(db)
+        self.db = db
+        self.company_id = company_id
+        self.evaluation_id = evaluation_id
         
         print("✅ Document Agent initialized successfully")
     
@@ -246,22 +237,34 @@ Be thorough, precise, and flag ALL potential issues. Your analysis will be used 
                 user_message += f"Text content:\n{doc['text']}\n\n"
         
         user_message += "\nProvide complete structured analysis following the JSON format specified."
-        
-        # Call OpenAI API
-        response = self.client.chat.completions.create(
-            model=self.model,
+
+        # 🔥 Use centralized LLM wrapper (with usage tracking)
+        response = self.llm.invoke(
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message}
             ],
-            temperature=0.3,  # Lower temperature for factual extraction
-            response_format={"type": "json_object"}
+            company_id=self.company_id,
+            evaluation_id=self.evaluation_id,
+            agent_name="document_agent",
+            response_format={"type": "json_object"},
+            temperature=0.2
         )
-        
-        # Parse JSON response
-        analysis = json.loads(response.choices[0].message.content)
-        
+
+
+
+
+        content = response["content"]
+
+        # Parse JSON safely
+        try:
+            analysis = json.loads(content)
+        except json.JSONDecodeError:
+            raise ValueError("LLM response was not valid JSON")
+
         return analysis
+        
+        
 
 
 # Test function
@@ -287,7 +290,8 @@ if __name__ == "__main__":
     print("\n🧪 TEST 1: Agent Initialization")
     print("-" * 70)
     try:
-        agent = DocumentAgent()
+        agent = DocumentAgent(db=None, company_id=None, evaluation_id=None)
+       
         print("✅ Agent initialized successfully with OpenAI connection")
     except Exception as e:
         print(f"❌ Initialization failed: {str(e)}")

@@ -9,11 +9,7 @@ import os
 import json
 from typing import Dict, List, Optional
 from datetime import datetime
-from openai import OpenAI
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
 
 
 class DecisionAgent:
@@ -29,24 +25,17 @@ class DecisionAgent:
     - Generates audit-ready reports
     """
     
-    def __init__(self):
+    def __init__(self, db, company_id, evaluation_id):
         """
         Initialize the Decision Agent
         Sets up OpenAI API connection
         """
-        # Get API key from environment variable
-        api_key = os.getenv("OPENAI_API_KEY")
-        
-        if not api_key:
-            raise ValueError(
-                "❌ OPENAI_API_KEY not found! "
-                "Make sure your .env file has: OPENAI_API_KEY=sk-..."
-            )
-        
-        # Create OpenAI client
-        self.client = OpenAI(api_key=api_key)
-        self.model = "gpt-4o-mini"
-        
+        from api.services.llm_service import LLMService
+
+        self.llm = LLMService(db)
+        self.db = db
+        self.company_id = company_id
+        self.evaluation_id = evaluation_id
         print("✅ Decision Agent initialized successfully")
     
     
@@ -276,18 +265,23 @@ Based on ALL the evidence above, provide your final risk assessment decision in 
 """
 
         # Call OpenAI API
-        response = self.client.chat.completions.create(
-            model=self.model,
+        response = self.llm.invoke(
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message}
             ],
-            temperature=0.3,  # Lower temperature for consistent, logical decisions
-            response_format={"type": "json_object"}
+            company_id=self.company_id,
+            evaluation_id=self.evaluation_id,
+            agent_name="decision_agent",
+            response_format={"type": "json_object"},
+            temperature=0.3
         )
-        
-        # Parse JSON response
-        decision = json.loads(response.choices[0].message.content)
+        content = response["content"]
+        # Safe JSON parsing
+        try:
+            decision = json.loads(content)
+        except json.JSONDecodeError:
+            raise ValueError("LLM response was not valid JSON")
         
         # Add metadata
         decision["evaluated_at"] = datetime.now().isoformat()
@@ -318,7 +312,7 @@ if __name__ == "__main__":
     print("\n🧪 TEST 1: Agent Initialization")
     print("-" * 70)
     try:
-        agent = DecisionAgent()
+        agent = DecisionAgent(db=None, company_id=None, evaluation_id=None)
         print("✅ Agent initialized successfully with OpenAI connection")
     except Exception as e:
         print(f"❌ Initialization failed: {str(e)}")

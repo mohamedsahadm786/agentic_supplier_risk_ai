@@ -8,17 +8,12 @@ Technology: Orchestrates MCP-2 (News), MCP-3 (Registry), MCP-4 (Sanctions)
 import os
 import sys
 from typing import Dict, List, Optional
-from openai import OpenAI
-from dotenv import load_dotenv
 
 # Import MCP tools
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from mcp_tools.news_tools import search_news, analyze_sentiment
 from mcp_tools.registry_tools import check_uk_companies_house, verify_business_entity
 from mcp_tools.sanctions_tools import check_sanctions_list, check_watchlist
-
-# Load environment variables
-load_dotenv()
 
 
 class ExternalAgent:
@@ -34,23 +29,17 @@ class ExternalAgent:
     - Does NOT make risk decisions - only reports findings
     """
     
-    def __init__(self):
+    def __init__(self, db, company_id, evaluation_id):
         """
         Initialize the External Intelligence Agent
         Sets up OpenAI API connection (for sentiment analysis enhancement)
         """
-        # Get API key from environment variable
-        api_key = os.getenv("OPENAI_API_KEY")
-        
-        if not api_key:
-            raise ValueError(
-                "❌ OPENAI_API_KEY not found! "
-                "Make sure your .env file has: OPENAI_API_KEY=sk-..."
-            )
-        
-        # Create OpenAI client
-        self.client = OpenAI(api_key=api_key)
-        self.model = "gpt-4o-mini"
+        from api.services.llm_service import LLMService
+
+        self.llm = LLMService(db)
+        self.db = db
+        self.company_id = company_id
+        self.evaluation_id = evaluation_id
         
         print("✅ External Intelligence Agent initialized successfully")
     
@@ -302,7 +291,7 @@ if __name__ == "__main__":
     print("\n🧪 TEST 1: Agent Initialization")
     print("-" * 70)
     try:
-        agent = ExternalAgent()
+        agent = ExternalAgent(db=None, company_id=None, evaluation_id=None)
         print("✅ Agent initialized successfully with OpenAI connection")
     except Exception as e:
         print(f"❌ Initialization failed: {str(e)}")
@@ -437,3 +426,4 @@ if __name__ == "__main__":
     
     print("\n✅ EXTERNAL AGENT TESTS COMPLETED")
     print("=" * 70)
+    

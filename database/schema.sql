@@ -170,10 +170,35 @@ FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 INSERT INTO companies (company_name, subscription_tier, max_users, max_evaluations_per_month)
 VALUES ('Demo Company', 'free', 10, 100);
 
+
+-- Table 9: Usage Tracking (LLM Cost Monitoring)
+CREATE TABLE IF NOT EXISTS usage_tracking (
+    id SERIAL PRIMARY KEY,
+
+    company_id UUID REFERENCES companies(company_id) ON DELETE CASCADE,
+    evaluation_id UUID REFERENCES evaluations(evaluation_id) ON DELETE CASCADE,
+
+    agent_name VARCHAR(100),
+    model_name VARCHAR(50),
+
+    prompt_tokens INTEGER DEFAULT 0,
+    completion_tokens INTEGER DEFAULT 0,
+    total_tokens INTEGER DEFAULT 0,
+
+    total_cost DECIMAL(10,6) DEFAULT 0,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for performance
+CREATE INDEX idx_usage_company_id ON usage_tracking(company_id);
+CREATE INDEX idx_usage_evaluation_id ON usage_tracking(evaluation_id);
+CREATE INDEX idx_usage_created_at ON usage_tracking(created_at DESC);
+
 -- Success Message
 DO $$
 BEGIN
     RAISE NOTICE 'Database schema created successfully!';
-    RAISE NOTICE 'Total tables: 8';
+    RAISE NOTICE 'Total tables: 9';
     RAISE NOTICE 'Demo company created with company_name: Demo Company';
 END $$;

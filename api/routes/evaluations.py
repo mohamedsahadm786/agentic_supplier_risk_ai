@@ -25,7 +25,7 @@ from uuid import UUID
 # Import the LangGraph workflow with error handling
 try:
     from workflows.evaluation_workflow import run_evaluation
-    WORKFLOW_AVAILABLE = False
+    WORKFLOW_AVAILABLE = True
 except ImportError as e:
     print(f"⚠️ Warning: Could not import evaluation workflow: {e}")
     print("   Evaluation creation will return mock data instead of running real agents.")
@@ -250,6 +250,24 @@ def run_evaluation_background(
     engine = create_engine(DATABASE_URL)
     SessionLocal = sessionmaker(bind=engine)
     db = SessionLocal()
+
+    # ============================================
+    # Fetch company_id from evaluations table
+    # ============================================
+
+    company_record = db.execute(
+        text("""
+            SELECT company_id
+            FROM evaluations
+            WHERE evaluation_id = :evaluation_id
+        """),
+        {"evaluation_id": evaluation_id}
+    ).fetchone()
+
+    company_id = company_record.company_id if company_record else None
+
+    if not company_id:
+        raise Exception("Company ID not found for evaluation")
     
     try:
         print(f"🚀 Starting evaluation {evaluation_id} for supplier: {supplier_name}")
@@ -266,7 +284,13 @@ def run_evaluation_background(
         }
         
         print(f"   Running 5-agent workflow...")
-        final_state = run_evaluation(supplier_info)
+        final_state = run_evaluation(
+            supplier_info=supplier_info,
+            db=db,
+            company_id=company_id,
+            evaluation_id=evaluation_id
+        )
+        
         
         final_decision = final_state.get("final_decision", {})
 

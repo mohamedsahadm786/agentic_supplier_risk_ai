@@ -8,8 +8,6 @@ Technology: HuggingFace embeddings + Qdrant vector search + OpenAI GPT-4
 import os
 import sys
 from typing import List, Dict, Optional
-from openai import OpenAI
-from dotenv import load_dotenv
 
 # Import RAG retrieval system
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -59,8 +57,6 @@ def search_similar_chunks(query: str, top_k: int = 5, min_score: float = 0.3) ->
         print(f"   ⚠️ RAG search error: {str(e)}")
         return []
 
-# Load environment variables
-load_dotenv()
 
 
 class RAGAgent:
@@ -75,25 +71,20 @@ class RAGAgent:
     - Does NOT search the internet - only internal knowledge base
     """
     
-    def __init__(self):
+    def __init__(self, db, company_id, evaluation_id):
         """
         Initialize the RAG Knowledge Agent
         Sets up OpenAI API connection
         """
-        # Get API key from environment variable
-        api_key = os.getenv("OPENAI_API_KEY")
-        
-        if not api_key:
-            raise ValueError(
-                "❌ OPENAI_API_KEY not found! "
-                "Make sure your .env file has: OPENAI_API_KEY=sk-..."
-            )
-        
-        # Create OpenAI client
-        self.client = OpenAI(api_key=api_key)
-        self.model = "gpt-4o-mini"
-        
-        print("✅ RAG Agent initialized successfully")
+        from api.services.llm_service import LLMService
+
+        self.llm = LLMService(db)
+        self.db = db
+        self.company_id = company_id
+        self.evaluation_id = evaluation_id
+
+        print("✅ RAG Agent initialized (LLM centralized)")
+
     
     
     def answer_question(
@@ -253,18 +244,18 @@ Question: {question}
 Please provide a detailed answer based ONLY on the context above. Include citations and assess your confidence level."""
 
         try:
-            # Call OpenAI API
-            response = self.client.chat.completions.create(
-                model=self.model,
+            response = self.llm.invoke(
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
                 ],
-                temperature=0.2,  # Low temperature for factual responses
-                max_tokens=800
+                company_id=self.company_id,
+                evaluation_id=self.evaluation_id,
+                agent_name="rag_agent",
+                temperature=0.2
             )
-            
-            answer_text = response.choices[0].message.content
+
+            answer_text = response["content"]
             
             # Extract sources from results
             sources = []
