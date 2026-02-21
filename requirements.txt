@@ -58,3 +58,4 @@ python-jose[cryptography]==3.3.0
 
 
 email-validator==2.2.0
+resend

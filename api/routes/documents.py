@@ -5,7 +5,7 @@ Handles:
 - Uploading supplier documents to MinIO
 - Storing metadata in PostgreSQL
 """
-
+from botocore.client import Config
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -60,12 +60,16 @@ async def upload_document(
         )
 
     # Connect to MinIO
+    # Connect to MinIO
     s3_client = boto3.client(
         "s3",
         endpoint_url=os.getenv("MINIO_ENDPOINT", "http://localhost:9000"),
         aws_access_key_id=os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
-        aws_secret_access_key=os.getenv("MINIO_SECRET_KEY", "minioadmin"),
+        aws_secret_access_key=os.getenv("MINIO_SECRET_KEY", "minioadmin123"),
+        region_name="us-east-1",
+        config=Config(signature_version="s3v4"),
     )
+
 
     bucket_name = os.getenv("MINIO_BUCKET_NAME", "supplier-documents")
 

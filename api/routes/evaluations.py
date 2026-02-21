@@ -16,7 +16,7 @@ import json
 import traceback
 from sqlalchemy import text  # Add this line
 from sqlalchemy.orm import Session
-
+from ..services.email_service import send_evaluation_email
 from ..database import get_db
 from ..models import EvaluationCreate, EvaluationResponse
 from ..middleware import get_current_user, require_role
@@ -52,6 +52,39 @@ async def create_evaluation(
     Create a new supplier risk evaluation.
     """
     company_id = current_user["company_id"]
+
+    # ---------------------------------------------------
+    # Subscription Enforcement: Monthly Evaluation Limit
+    # ---------------------------------------------------
+
+    # Get subscription limits
+    company = db.execute(
+        text("""
+        SELECT max_evaluations_per_month
+        FROM companies
+        WHERE company_id = :company_id
+        """),
+        {"company_id": company_id}
+    ).fetchone()
+
+    max_evaluations = company.max_evaluations_per_month
+
+    # Count evaluations created this month
+    evaluation_count = db.execute(
+        text("""
+        SELECT COUNT(*)
+        FROM evaluations
+        WHERE company_id = :company_id
+        AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
+        """),
+        {"company_id": company_id}
+    ).scalar()
+
+    if evaluation_count >= max_evaluations:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Monthly evaluation limit reached for your subscription plan"
+        )
     
     # Verify supplier exists and belongs to this company
     supplier = db.execute(
@@ -189,6 +222,7 @@ async def create_evaluation(
     )
 
 
+
 # ============================================
 # BACKGROUND TASK: RUN REAL EVALUATION
 # ============================================
@@ -234,11 +268,9 @@ def run_evaluation_background(
         print(f"   Running 5-agent workflow...")
         final_state = run_evaluation(supplier_info)
         
-        # Extract final decision correctly
         final_decision = final_state.get("final_decision", {})
 
         risk_level = final_decision.get("risk_level")
-
         if risk_level not in ["Low", "Medium", "High"]:
             risk_level = None
 
@@ -250,8 +282,7 @@ def run_evaluation_background(
         openai_cost = 0.05
         
         db.execute(
-            text(
-            """
+            text("""
             UPDATE evaluations
             SET status = 'completed',
                 risk_level = :risk_level,
@@ -264,8 +295,7 @@ def run_evaluation_background(
                 completed_at = NOW(),
                 updated_at = NOW()
             WHERE evaluation_id = :evaluation_id
-            """
-            ),
+            """),
             {
                 "evaluation_id": evaluation_id,
                 "risk_level": risk_level,
@@ -280,24 +310,22 @@ def run_evaluation_background(
         db.commit()
         
         db.execute(
-            text(
-            """
+            text("""
             UPDATE suppliers
             SET risk_level = :risk_level,
                 updated_at = NOW()
             WHERE supplier_id = (
                 SELECT supplier_id FROM evaluations WHERE evaluation_id = :evaluation_id
             )
-            """
-            ),
+            """),
             {"risk_level": risk_level, "evaluation_id": evaluation_id}
         )
         db.commit()
+
         # ============================================
-        # INSERT NOTIFICATION RECORD
+        # INSERT NOTIFICATION + SEND EMAIL
         # ============================================
 
-        # Fetch user email
         user_record = db.execute(
             text("""
                 SELECT email FROM users
@@ -309,6 +337,8 @@ def run_evaluation_background(
         recipient_email = user_record.email if user_record else None
 
         if recipient_email:
+
+            # Insert notification
             db.execute(
                 text("""
                     INSERT INTO notifications (
@@ -339,8 +369,40 @@ def run_evaluation_background(
                 }
             )
             db.commit()
-        
-        
+
+            # Send Email
+            print("📧 Triggering email send (real workflow)...")
+
+            email_result = send_evaluation_email(
+                to_email=recipient_email,
+                subject="Supplier Risk Evaluation Completed",
+                message=f"Your evaluation for {supplier_name} has been completed. Risk Level: {risk_level}"
+            )
+
+            print("📨 Email result:", email_result)
+
+            if email_result["success"]:
+                db.execute(
+                    text("""
+                        UPDATE notifications
+                        SET status = 'sent',
+                            sent_at = NOW()
+                        WHERE evaluation_id = :evaluation_id
+                    """),
+                    {"evaluation_id": evaluation_id}
+                )
+            else:
+                db.execute(
+                    text("""
+                        UPDATE notifications
+                        SET status = 'failed'
+                        WHERE evaluation_id = :evaluation_id
+                    """),
+                    {"evaluation_id": evaluation_id}
+                )
+
+            db.commit()
+
         print(f"✅ Evaluation {evaluation_id} completed successfully!")
         
     except Exception as e:
@@ -348,15 +410,13 @@ def run_evaluation_background(
         print(traceback.format_exc())
         
         db.execute(
-            text(
-            """
+            text("""
             UPDATE evaluations
             SET status = 'failed',
                 reasoning = :error_message,
                 updated_at = NOW()
             WHERE evaluation_id = :evaluation_id
-            """
-            ),
+            """),
             {
                 "evaluation_id": evaluation_id,
                 "error_message": f"Evaluation failed: {str(e)}"
@@ -440,7 +500,6 @@ def run_mock_evaluation(evaluation_id: UUID):
         # INSERT NOTIFICATION RECORD (MOCK MODE)
         # ============================================
 
-        # Fetch user_id from evaluation
         eval_record = db.execute(
             text("""
                 SELECT user_id FROM evaluations
@@ -463,6 +522,7 @@ def run_mock_evaluation(evaluation_id: UUID):
             recipient_email = user_record.email if user_record else None
 
             if recipient_email:
+                # Insert notification record
                 db.execute(
                     text("""
                         INSERT INTO notifications (
@@ -493,7 +553,43 @@ def run_mock_evaluation(evaluation_id: UUID):
                     }
                 )
                 db.commit()
-        
+
+                # ---------------------------------------------------
+                # Send Email Notification Automatically (MOCK MODE)
+                # ---------------------------------------------------
+
+                print("📧 Triggering email send (mock mode)...")
+
+                email_result = send_evaluation_email(
+                    to_email=recipient_email,
+                    subject="Supplier Risk Evaluation Completed (Mock)",
+                    message=f"Your evaluation {evaluation_id} has completed (mock mode)."
+                )
+
+                print("📨 Email result:", email_result)
+
+                if email_result["success"]:
+                    db.execute(
+                        text("""
+                            UPDATE notifications
+                            SET status = 'sent',
+                                sent_at = NOW()
+                            WHERE evaluation_id = :evaluation_id
+                        """),
+                        {"evaluation_id": evaluation_id}
+                    )
+                else:
+                    db.execute(
+                        text("""
+                            UPDATE notifications
+                            SET status = 'failed'
+                            WHERE evaluation_id = :evaluation_id
+                        """),
+                        {"evaluation_id": evaluation_id}
+                    )
+
+                db.commit()
+
         print(f"✅ Mock evaluation {evaluation_id} completed")
         
     except Exception as e:
