@@ -37,7 +37,7 @@ from .middleware import get_current_user
 
 # Import routes
 try:
-    from .routes import suppliers, evaluations, documents, notifications, users
+    from .routes import suppliers, evaluations, documents, notifications, users, admin
 except ImportError as e:
     print(f"⚠️ Warning: Could not import routes: {e}")
     suppliers = None
@@ -45,6 +45,8 @@ except ImportError as e:
     documents = None
     notifications = None
     users = None
+    admin = None
+
 
 
 # ============================================
@@ -455,6 +457,13 @@ if users is not None:
         users.router,
         prefix="/api/users",
         tags=["Users"]
+    )
+
+if admin is not None:
+    app.include_router(
+        admin.router,
+        prefix="/api/admin",
+        tags=["Admin Analytics"]
     )
 
 # ============================================

@@ -130,3 +130,86 @@ async def upload_document(
         file_size_bytes=document.file_size_bytes,
         uploaded_at=document.upload_date
     )
+
+# ============================================
+# GET DOCUMENTS BY SUPPLIER
+# ============================================
+
+@router.get("/", )
+async def get_documents(
+    supplier_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get all documents uploaded for a specific supplier.
+    
+    Purpose:
+        After logging back in, user can retrieve all previously
+        uploaded document IDs for a supplier.
+        These IDs are then used when creating a new evaluation.
+    
+    Usage:
+        GET /api/documents/?supplier_id=your-supplier-uuid
+    
+    Returns:
+        List of documents with their IDs, names, types, and upload dates
+    """
+    company_id = current_user["company_id"]
+
+    # First verify the supplier belongs to this company
+    # (security check — users cannot see other companies' documents)
+    supplier = db.execute(
+        text("""
+            SELECT supplier_id
+            FROM suppliers
+            WHERE supplier_id = :supplier_id
+            AND company_id = :company_id
+        """),
+        {"supplier_id": supplier_id, "company_id": company_id}
+    ).fetchone()
+
+    if not supplier:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Supplier not found or does not belong to your company"
+        )
+
+    # Fetch all documents for this supplier
+    documents = db.execute(
+        text("""
+            SELECT
+                document_id,
+                document_type,
+                file_name,
+                file_path,
+                file_size_bytes,
+                upload_date
+            FROM documents
+            WHERE supplier_id = :supplier_id
+            ORDER BY upload_date DESC
+        """),
+        {"supplier_id": supplier_id}
+    ).fetchall()
+
+    if not documents:
+        return {
+            "supplier_id": str(supplier_id),
+            "total_documents": 0,
+            "documents": []
+        }
+
+    return {
+        "supplier_id": str(supplier_id),
+        "total_documents": len(documents),
+        "documents": [
+            {
+                "document_id": str(doc.document_id),
+                "document_type": doc.document_type,
+                "file_name": doc.file_name,
+                "file_size_bytes": doc.file_size_bytes,
+                "uploaded_at": doc.upload_date.isoformat() if doc.upload_date else None
+            }
+            for doc in documents
+        ]
+    }

@@ -11,9 +11,12 @@ CREATE TABLE companies (
     subscription_tier VARCHAR(50) DEFAULT 'free',
     max_users INTEGER DEFAULT 5,
     max_evaluations_per_month INTEGER DEFAULT 50,
+    is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+
 
 -- Table 2: Users (Authentication)
 CREATE TABLE users (
@@ -22,7 +25,7 @@ CREATE TABLE users (
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     full_name VARCHAR(255) NOT NULL,
-    role VARCHAR(50) DEFAULT 'analyst' CHECK (role IN ('admin', 'analyst', 'viewer')),
+    role VARCHAR(50) DEFAULT 'analyst' CHECK (role IN ('super_admin', 'admin', 'analyst', 'viewer')),
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
