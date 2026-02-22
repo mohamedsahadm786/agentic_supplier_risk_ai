@@ -12,6 +12,9 @@ To run this server:
 """
 
 from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+security = HTTPBearer()
 
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -198,11 +201,26 @@ async def signup(user_data: UserSignup, db: Session = Depends(get_db)):
         {"company_name": user_data.company_name}
     ).fetchone()
 
+
     if company:
-        company_id = company[0]
-        assigned_role = "analyst"   # Existing company → analyst
+        # -------------------------------------------------------
+        # Company already exists → BLOCK the signup
+        # Analysts and viewers must be created by admin only
+        # via POST /api/users/ endpoint
+        # -------------------------------------------------------
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "This company already has an account. "
+                "New users must be added by your company admin. "
+                "Please contact your admin to get access."
+            )
+        )
     else:
-        # Create new company
+        # -------------------------------------------------------
+        # New company → Create company + assign admin role
+        # This person is the first user = company owner = admin
+        # -------------------------------------------------------
         company_result = db.execute(
             text("""
             INSERT INTO companies (company_name, subscription_tier, max_users, created_at, updated_at)
@@ -214,7 +232,9 @@ async def signup(user_data: UserSignup, db: Session = Depends(get_db)):
         company_id = company_result.fetchone()[0]
         db.commit()
 
-        assigned_role = "admin"  # First user becomes admin
+        assigned_role = "admin"  # First user = admin always
+
+   
 
     # ---------------------------------------------------
     # Create user
@@ -334,6 +354,46 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
     
     return TokenResponse(access_token=token)
     
+
+
+@app.post("/auth/logout", tags=["Authentication"])
+async def logout(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Logout current user.
+    
+    Process:
+    1. Extract the JWT token from Authorization header
+    2. Add token to Redis blacklist (expires in 24 hours automatically)
+    3. Future requests with this token will be rejected
+    
+    After logout, the frontend should:
+    - Delete the token from localStorage
+    - Redirect user to login page
+    """
+    from .services.rate_limiter import blacklist_token
+    from fastapi.security import HTTPAuthorizationCredentials
+
+    token = credentials.credentials
+
+    # Blacklist the token in Redis
+    # 86400 seconds = 24 hours (matches JWT expiry in your .env: 1440 minutes)
+    success = blacklist_token(token, expires_in_seconds=86400)
+
+    if success:
+        return {
+            "message": "Successfully logged out",
+            "detail": "Your session has been invalidated"
+        }
+    else:
+        # Even if Redis fails, we tell user logout succeeded
+        # Frontend will delete the token anyway
+        return {
+            "message": "Logged out",
+            "detail": "Session cleared"
+        }
 
 @app.get("/auth/me", tags=["Authentication"])
 async def get_current_user_info(current_user: dict = Depends(get_current_user)):

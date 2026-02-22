@@ -6,7 +6,6 @@ load_dotenv()
 
 resend.api_key = os.getenv("RESEND_API_KEY")
 FROM_EMAIL = os.getenv("FROM_EMAIL", "onboarding@resend.dev")
-print("RESEND KEY:", os.getenv("RESEND_API_KEY"))
 
 
 def send_evaluation_email(to_email: str, subject: str, message: str) -> dict:

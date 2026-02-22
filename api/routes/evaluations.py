@@ -19,13 +19,13 @@ from sqlalchemy.orm import Session
 from ..services.email_service import send_evaluation_email
 from ..database import get_db
 from ..models import EvaluationCreate, EvaluationResponse
-from ..middleware import get_current_user, require_role
+from ..middleware import get_current_user, require_role, rate_limit_evaluation
 from uuid import UUID
 
 # Import the LangGraph workflow with error handling
 try:
     from workflows.evaluation_workflow import run_evaluation
-    WORKFLOW_AVAILABLE = True
+    WORKFLOW_AVAILABLE = False
 except ImportError as e:
     print(f"⚠️ Warning: Could not import evaluation workflow: {e}")
     print("   Evaluation creation will return mock data instead of running real agents.")
@@ -39,15 +39,16 @@ router = APIRouter()
 # ============================================
 # CREATE NEW EVALUATION
 # ============================================
-
 @router.post("/", response_model=EvaluationResponse, status_code=status.HTTP_201_CREATED)
 async def create_evaluation(
     evaluation_data: EvaluationCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_role(["admin", "analyst"]))
-
+    current_user: dict = Depends(require_role(["admin", "analyst"])),
+    _rate_limit: dict = Depends(rate_limit_evaluation)
 ):
+
+
     """
     Create a new supplier risk evaluation.
     """

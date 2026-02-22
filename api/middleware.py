@@ -17,6 +17,17 @@ security = HTTPBearer()
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials
 
+    # -------------------------------------------------------
+    # Check if token has been blacklisted (user logged out)
+    # -------------------------------------------------------
+    from .services.rate_limiter import is_token_blacklisted
+    if is_token_blacklisted(token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been invalidated. Please login again.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     payload = decode_access_token(token)
 
     if payload is None:
@@ -27,6 +38,9 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         )
 
     return payload
+
+
+
 
 
 # ============================================
@@ -78,3 +92,47 @@ def require_role(allowed_roles: list):
         return user
 
     return role_checker
+
+# ============================================
+# RATE LIMITING DEPENDENCY
+# ============================================
+
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from .services.rate_limiter import check_rate_limit
+
+def rate_limit_evaluation(current_user: dict = Depends(get_current_user)):
+    """
+    Rate limiting dependency for evaluation endpoint.
+
+    Allows maximum 10 evaluation requests per user per 60 seconds.
+
+    If exceeded:
+        Returns HTTP 429 Too Many Requests
+        Tells user how many seconds to wait
+
+    Usage in route:
+        Depends(rate_limit_evaluation)
+    """
+    user_id = current_user.get("user_id")
+
+    result = check_rate_limit(
+        user_id=str(user_id),
+        endpoint="evaluations",
+        max_requests=10,
+        window_seconds=60
+    )
+
+    if not result["allowed"]:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "error": "Rate limit exceeded",
+                "message": f"You have made too many evaluation requests. Maximum is 10 per minute.",
+                "retry_after_seconds": result["retry_after"],
+                "current_count": result["current_count"],
+                "max_requests": result["max_requests"]
+            }
+        )
+
+    return current_user
