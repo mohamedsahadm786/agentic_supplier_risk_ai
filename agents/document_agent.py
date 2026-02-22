@@ -77,21 +77,34 @@ class DocumentAgent:
         documents_content = []
         for i, doc_path in enumerate(document_paths, 1):
             print(f"   Reading document {i}/{len(document_paths)}: {os.path.basename(doc_path)}")
-            
+
             try:
                 # Read PDF using MCP-1 Document Tools
-                text = read_pdf(doc_path)
-                
+                # read_pdf() returns a DICTIONARY: {"success": True, "text": "...", ...}
+                pdf_result = read_pdf(doc_path)
+
+                # Extract the actual text string from the dictionary
+                if pdf_result.get("success"):
+                    extracted_text = pdf_result.get("text", "")
+                    page_count = pdf_result.get("page_count", 0)
+                else:
+                    extracted_text = ""
+                    page_count = 0
+                    print(f"   ⚠️ PDF read failed: {pdf_result.get('error', 'Unknown error')}")
+
                 # Also try to extract tables if present
-                tables = extract_tables(doc_path)
-                
+                # extract_tables() also returns a DICTIONARY: {"success": True, "tables": [...], ...}
+                tables_result = extract_tables(doc_path)
+                table_count = tables_result.get("table_count", 0) if tables_result.get("success") else 0
+
                 documents_content.append({
                     "filename": os.path.basename(doc_path),
-                    "text": text[:10000],  # Limit to 10K chars per doc (API limits)
-                    "has_tables": len(tables) > 0,
-                    "table_count": len(tables)
+                    "text": extracted_text[:10000],  # Limit to 10K chars per doc
+                    "has_tables": table_count > 0,
+                    "table_count": table_count,
+                    "page_count": page_count
                 })
-                
+
             except Exception as e:
                 print(f"   ⚠️ Error reading {doc_path}: {str(e)}")
                 documents_content.append({
@@ -99,6 +112,8 @@ class DocumentAgent:
                     "text": "",
                     "error": str(e)
                 })
+            
+           
         
         # Step 2: Use GPT-4 to extract structured data
         print(f"\n🧠 Analyzing content with AI...")

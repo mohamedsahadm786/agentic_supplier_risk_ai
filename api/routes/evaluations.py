@@ -25,7 +25,7 @@ from uuid import UUID
 # Import the LangGraph workflow with error handling
 try:
     from workflows.evaluation_workflow import run_evaluation
-    WORKFLOW_AVAILABLE = False
+    WORKFLOW_AVAILABLE = True
 except ImportError as e:
     print(f"⚠️ Warning: Could not import evaluation workflow: {e}")
     print("   Evaluation creation will return mock data instead of running real agents.")
