@@ -42,3 +42,30 @@ logs/
 build/
 dist/
 *.egg-info/
+
+
+# =========================
+# FRONTEND (React / Vite)
+# =========================
+
+# Node modules (CRITICAL)
+node_modules/
+frontend/node_modules/
+
+# Vite cache
+.vite/
+frontend/.vite/
+
+# Build output
+dist/
+frontend/dist/
+
+# Package manager logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Optional lockfile ignore (only if needed)
+# package-lock.json
+# yarn.lock
