@@ -172,16 +172,34 @@ export default function EvaluationResultsPage() {
   }
 
   // Parse agent outputs safely
-  const agentOutputs  = evaluation.agent_outputs  || {};
-  const docOutput     = agentOutputs.document_output  || agentOutputs.document_agent  || {};
-  const ragOutput     = agentOutputs.rag_output        || agentOutputs.rag_agent       || {};
-  const extOutput     = agentOutputs.external_output   || agentOutputs.external_agent  || {};
-  const finalDecision = agentOutputs.final_decision    || {};
+  // Parse agent outputs — mapped to actual backend JSON structure
+  const agentOutputs   = evaluation.agent_outputs || {};
+  const finalDecision  = agentOutputs.final_decision    || {};
+  const docOutput      = agentOutputs.document_analysis || {};
+  const extOutput      = agentOutputs.external_intelligence || {};
+  const ragOutput      = agentOutputs.rag_answers       || {};
 
-  const riskFactors       = evaluation.risk_factors       || finalDecision.risk_factors       || {};
-  const positiveFactors   = riskFactors.positive          || [];
-  const negativeFactors   = riskFactors.negative          || [];
-  const recommendedActions= evaluation.recommended_actions|| finalDecision.recommended_actions|| [];
+  // Risk factors from final_decision
+  const positiveFactors    = finalDecision.positive_factors    || [];
+  const negativeFactors    = finalDecision.negative_factors    || [];
+  const recommendedActions = evaluation.recommended_actions
+    || finalDecision.recommended_actions || [];
+
+  // Document analysis
+  const docSummaries  = docOutput.document_summaries || [];
+  const extractedData = docOutput.extracted_data     || {};
+  const missingData   = docOutput.missing_data       || [];
+
+  // External intelligence
+  const sanctionsCheck   = extOutput.sanctions_check   || {};
+  const watchlistCheck   = extOutput.watchlist_check   || {};
+  const companyRegistry  = extOutput.company_registry  || {};
+  const newsArticles     = extOutput.news_analysis?.articles || [];
+
+  // RAG answers
+  const ragAnswers = ragOutput.answers || [];
+
+
 
   return (
     <AppLayout>
@@ -297,124 +315,234 @@ export default function EvaluationResultsPage() {
       )}
 
       {/* ── Accordion Sections ── */}
-
       {/* Document Analysis */}
       <Accordion title="Document Analysis" icon="📄" defaultOpen={false}>
-        <div style={{ paddingTop: '16px' }}>
-          {docOutput.extracted_data && Object.keys(docOutput.extracted_data).length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {Object.entries(docOutput.extracted_data).map(([key, val]) => (
-                <div key={key} style={{ display: 'flex', gap: '12px', padding: '8px 0', borderBottom: '1px solid rgba(26,58,92,0.3)' }}>
-                  <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.8rem', color: '#64748B', minWidth: '160px', textTransform: 'capitalize' }}>
-                    {key.replace(/_/g, ' ')}
-                  </span>
-                  <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.8rem', color: '#CBD5E1' }}>
-                    {typeof val === 'object' ? JSON.stringify(val) : String(val)}
-                  </span>
+        <div style={{ paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+          {/* Document Summaries — key_findings per document */}
+          {docSummaries.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {docSummaries.map((doc, i) => (
+                <div key={i} style={{ padding: '16px', borderRadius: '10px', background: 'rgba(26,58,92,0.3)', border: '1px solid rgba(26,58,92,0.5)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '0.9rem' }}>📄</span>
+                    <span style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.8rem', fontWeight: 700, color: '#00D4FF' }}>
+                      {doc.filename || `Document ${i + 1}`}
+                    </span>
+                    {doc.document_type && (
+                      <span style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.65rem', fontWeight: 600, padding: '1px 8px', borderRadius: '999px', background: 'rgba(59,130,246,0.1)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.2)', textTransform: 'capitalize' }}>
+                        {doc.document_type}
+                      </span>
+                    )}
+                  </div>
+                  <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.875rem', color: '#CBD5E1', lineHeight: 1.6 }}>
+                    {doc.key_findings}
+                  </p>
                 </div>
               ))}
             </div>
           ) : (
-            <p style={{ color: '#4A6080', fontFamily: 'DM Sans, sans-serif', fontSize: '0.875rem', paddingTop: '8px' }}>
-              No document data extracted.
+            <p style={{ color: '#4A6080', fontFamily: 'DM Sans, sans-serif', fontSize: '0.875rem' }}>
+              No document summaries available.
             </p>
           )}
-          {docOutput.missing_data && docOutput.missing_data.length > 0 && (
-            <div style={{ marginTop: '16px' }}>
-              <h4 style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.8rem', fontWeight: 700, color: '#F59E0B', marginBottom: '8px' }}>
-                ⚠️ Missing Information
+
+          {/* Extracted Key Data */}
+          {Object.keys(extractedData).length > 0 && (
+            <div>
+              <h4 style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.8rem', fontWeight: 700, color: '#94A3B8', marginBottom: '10px' }}>
+                EXTRACTED DATA
               </h4>
-              {docOutput.missing_data.map((m, i) => (
-                <div key={i} style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.8rem', color: '#94A3B8', padding: '4px 0' }}>
-                  • {m}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {Object.entries(extractedData)
+                  .filter(([, val]) => val !== null && val !== undefined && val !== '' && !(Array.isArray(val) && val.length === 0))
+                  .map(([key, val]) => (
+                    <div key={key} style={{ display: 'flex', gap: '12px', padding: '6px 0', borderBottom: '1px solid rgba(26,58,92,0.3)' }}>
+                      <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.8rem', color: '#64748B', minWidth: '160px', textTransform: 'capitalize' }}>
+                        {key.replace(/_/g, ' ')}
+                      </span>
+                      <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.8rem', color: '#CBD5E1' }}>
+                        {typeof val === 'object' ? JSON.stringify(val) : String(val)}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Missing Data */}
+          {missingData.length > 0 && (
+            <div style={{ padding: '14px', borderRadius: '8px', background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)' }}>
+              <h4 style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.8rem', fontWeight: 700, color: '#F59E0B', marginBottom: '10px' }}>
+                ⚠️ MISSING INFORMATION
+              </h4>
+              {missingData.map((m, i) => (
+                <div key={i} style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.85rem', color: '#94A3B8', padding: '3px 0', display: 'flex', gap: '8px' }}>
+                  <span style={{ color: '#F59E0B' }}>•</span> {m}
                 </div>
               ))}
             </div>
           )}
         </div>
       </Accordion>
+
+
 
       {/* External Intelligence */}
       <Accordion title="External Intelligence" icon="🔍" defaultOpen={false}>
         <div style={{ paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {/* Sanctions */}
-          <div style={{ padding: '14px', borderRadius: '8px', background: 'rgba(26,58,92,0.3)' }}>
-            <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.8rem', fontWeight: 700, color: '#94A3B8', marginBottom: '6px' }}>
+
+          {/* Sanctions Check */}
+          <div style={{ padding: '14px', borderRadius: '8px', background: 'rgba(26,58,92,0.3)', border: '1px solid rgba(26,58,92,0.5)' }}>
+            <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.8rem', fontWeight: 700, color: '#94A3B8', marginBottom: '8px' }}>
               🛡️ SANCTIONS CHECK
             </div>
-            <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.875rem', color: '#CBD5E1' }}>
-              {extOutput.sanctions_check || 'No data available'}
+            <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.875rem', color: sanctionsCheck.risk_level === 'clear' ? '#10B981' : '#EF4444' }}>
+              {sanctionsCheck.message || 'No sanctions data available'}
             </div>
-          </div>
-          {/* Registry */}
-          <div style={{ padding: '14px', borderRadius: '8px', background: 'rgba(26,58,92,0.3)' }}>
-            <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.8rem', fontWeight: 700, color: '#94A3B8', marginBottom: '6px' }}>
-              🏢 COMPANY REGISTRY
-            </div>
-            <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.875rem', color: '#CBD5E1' }}>
-              {extOutput.company_registry
-                ? typeof extOutput.company_registry === 'object'
-                  ? `Status: ${extOutput.company_registry.status || 'Unknown'}`
-                  : extOutput.company_registry
-                : 'No registry data available'}
-            </div>
-          </div>
-          {/* News */}
-          <div style={{ padding: '14px', borderRadius: '8px', background: 'rgba(26,58,92,0.3)' }}>
-            <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.8rem', fontWeight: 700, color: '#94A3B8', marginBottom: '6px' }}>
-              📰 NEWS SIGNALS
-            </div>
-            {extOutput.news_signals && Array.isArray(extOutput.news_signals) && extOutput.news_signals.length > 0 ? (
-              extOutput.news_signals.slice(0, 3).map((n, i) => (
-                <div key={i} style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.8rem', color: '#CBD5E1', padding: '4px 0', borderBottom: i < 2 ? '1px solid rgba(26,58,92,0.4)' : 'none' }}>
-                  {n.headline || n.title || String(n)}
-                </div>
-              ))
-            ) : (
-              <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.875rem', color: '#CBD5E1' }}>
-                {extOutput.news_signals || 'No news data available'}
+            {sanctionsCheck.data_source && (
+              <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.75rem', color: '#4A6080', marginTop: '4px' }}>
+                Source: {sanctionsCheck.data_source}
+              </div>
+            )}
+            {sanctionsCheck.lists_checked && (
+              <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.75rem', color: '#4A6080', marginTop: '2px' }}>
+                Lists checked: {sanctionsCheck.lists_checked.join(', ')}
               </div>
             )}
           </div>
-          {/* Watchlist */}
-          <div style={{ padding: '14px', borderRadius: '8px', background: 'rgba(26,58,92,0.3)' }}>
-            <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.8rem', fontWeight: 700, color: '#94A3B8', marginBottom: '6px' }}>
+
+          {/* Watchlist Check */}
+          <div style={{ padding: '14px', borderRadius: '8px', background: 'rgba(26,58,92,0.3)', border: '1px solid rgba(26,58,92,0.5)' }}>
+            <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.8rem', fontWeight: 700, color: '#94A3B8', marginBottom: '8px' }}>
               ⚠️ WATCHLIST CHECK
             </div>
-            <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.875rem', color: '#CBD5E1' }}>
-              {extOutput.watchlist_check || 'No watchlist data available'}
+            <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.875rem', color: watchlistCheck.risk_level === 'clear' ? '#10B981' : '#EF4444' }}>
+              {watchlistCheck.message || 'No watchlist data available'}
             </div>
+            {watchlistCheck.sources_checked && (
+              <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.75rem', color: '#4A6080', marginTop: '4px' }}>
+                Checked: {watchlistCheck.sources_checked.slice(0, 3).join(' · ')}
+              </div>
+            )}
+          </div>
+
+          {/* Company Registry */}
+          <div style={{ padding: '14px', borderRadius: '8px', background: 'rgba(26,58,92,0.3)', border: '1px solid rgba(26,58,92,0.5)' }}>
+            <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.8rem', fontWeight: 700, color: '#94A3B8', marginBottom: '8px' }}>
+              🏢 COMPANY REGISTRY
+            </div>
+            <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.875rem', color: companyRegistry.verified ? '#10B981' : '#F59E0B', marginBottom: '4px' }}>
+              {companyRegistry.verified ? '✅ Verified' : '⚠️ Not Verified'} — {companyRegistry.registry_source || companyRegistry.country || ''}
+            </div>
+            {companyRegistry.note && (
+              <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.8rem', color: '#64748B', marginTop: '4px' }}>
+                {companyRegistry.note}
+              </div>
+            )}
+            {companyRegistry.recommendation && (
+              <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.8rem', color: '#94A3B8', marginTop: '4px', fontStyle: 'italic' }}>
+                💡 {companyRegistry.recommendation}
+              </div>
+            )}
+          </div>
+
+          {/* News Signals */}
+          <div style={{ padding: '14px', borderRadius: '8px', background: 'rgba(26,58,92,0.3)', border: '1px solid rgba(26,58,92,0.5)' }}>
+            <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.8rem', fontWeight: 700, color: '#94A3B8', marginBottom: '10px' }}>
+              📰 NEWS SIGNALS
+            </div>
+            {newsArticles.length === 0 ? (
+              <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.875rem', color: '#4A6080' }}>
+                No news articles found.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {newsArticles.map((article, i) => (
+                  <div key={i} style={{
+                    padding: '10px 12px', borderRadius: '8px',
+                    background: 'rgba(10,22,40,0.5)', border: '1px solid rgba(26,58,92,0.4)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                      <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.8rem', fontWeight: 600, color: '#E2E8F0' }}>
+                        {article.title}
+                      </span>
+                      <span style={{
+                        fontFamily: 'Syne, sans-serif', fontSize: '0.65rem', fontWeight: 600,
+                        padding: '1px 7px', borderRadius: '999px',
+                        background: article.sentiment?.sentiment === 'positive' ? 'rgba(16,185,129,0.15)'
+                          : article.sentiment?.sentiment === 'negative' ? 'rgba(239,68,68,0.15)'
+                          : 'rgba(100,116,139,0.15)',
+                        color: article.sentiment?.sentiment === 'positive' ? '#10B981'
+                          : article.sentiment?.sentiment === 'negative' ? '#EF4444'
+                          : '#94A3B8',
+                      }}>
+                        {article.sentiment?.sentiment || 'neutral'}
+                      </span>
+                    </div>
+                    <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.8rem', color: '#64748B', lineHeight: 1.5 }}>
+                      {article.description}
+                    </p>
+                    <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.72rem', color: '#4A6080', marginTop: '4px' }}>
+                      {article.source} · {article.published_at ? new Date(article.published_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </Accordion>
+
 
       {/* Compliance Knowledge */}
       <Accordion title="Compliance Knowledge (RAG)" icon="📚" defaultOpen={false}>
         <div style={{ paddingTop: '16px' }}>
-          {ragOutput.answers && Array.isArray(ragOutput.answers) && ragOutput.answers.length > 0 ? (
-            ragOutput.answers.map((item, i) => (
-              <div key={i} style={{ marginBottom: '16px', padding: '14px', borderRadius: '8px', background: 'rgba(26,58,92,0.3)' }}>
-                <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.8rem', fontWeight: 700, color: '#00D4FF', marginBottom: '6px' }}>
-                  Q: {item.question}
-                </div>
-                <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.85rem', color: '#CBD5E1', lineHeight: 1.6 }}>
-                  {item.answer}
-                </div>
-                {item.confidence && (
-                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.75rem', color: '#64748B', marginTop: '6px' }}>
-                    Confidence: {Math.round(item.confidence * 100)}%
-                  </div>
-                )}
-              </div>
-            ))
-          ) : (
-            <p style={{ color: '#4A6080', fontFamily: 'DM Sans, sans-serif', fontSize: '0.875rem', paddingTop: '8px' }}>
-              {ragOutput.answer || 'No compliance knowledge data available.'}
+          {ragAnswers.length === 0 ? (
+            <p style={{ color: '#4A6080', fontFamily: 'DM Sans, sans-serif', fontSize: '0.875rem' }}>
+              No compliance knowledge data available.
             </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {ragAnswers.map((item, i) => (
+                <div key={i} style={{ padding: '18px', borderRadius: '10px', background: 'rgba(26,58,92,0.3)', border: '1px solid rgba(26,58,92,0.5)' }}>
+                  {/* Question */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '12px' }}>
+                    <span style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '999px', background: 'rgba(0,212,255,0.1)', color: '#00D4FF', border: '1px solid rgba(0,212,255,0.2)', flexShrink: 0, marginTop: '2px' }}>
+                      Q{i + 1}
+                    </span>
+                    <span style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.875rem', fontWeight: 600, color: '#00D4FF' }}>
+                      {item.question}
+                    </span>
+                  </div>
+
+                  {/* Answer — parse line by line for numbered lists */}
+                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.875rem', color: '#CBD5E1', lineHeight: 1.7, paddingLeft: '8px', borderLeft: '2px solid rgba(0,212,255,0.2)' }}>
+                    {item.answer.split('\n').filter(l => l.trim()).map((line, j) => (
+                      <p key={j} style={{ marginBottom: '6px' }}>{line}</p>
+                    ))}
+                  </div>
+
+                  {/* Footer — confidence + sources */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '12px', flexWrap: 'wrap' }}>
+                    {item.confidence && (
+                      <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.75rem', color: '#64748B' }}>
+                        Confidence: {Math.round(item.confidence * 100)}%
+                      </span>
+                    )}
+                    {item.sources && item.sources.length > 0 && (
+                      <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.75rem', color: '#4A6080' }}>
+                        Sources: {[...new Set(item.sources.map(s => s.document))].join(', ')}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </Accordion>
-
+      
       {/* ── Footer Actions ── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',

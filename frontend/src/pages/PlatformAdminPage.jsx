@@ -38,17 +38,29 @@ function StatCard({ icon: Icon, label, value, color, bg, border }) {
 // Custom chart tooltip
 function ChartTooltip({ active, payload, label }) {
   if (active && payload?.length) {
+    const d = payload[0]?.payload || {};
     return (
-      <div style={{ background: 'rgba(13,31,53,0.95)', border: '1px solid rgba(26,58,92,0.8)', borderRadius: '8px', padding: '10px 14px' }}>
-        <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.8rem', color: '#00D4FF', marginBottom: '4px' }}>{label}</p>
-        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.85rem', color: '#E2E8F0' }}>
-          ${Number(payload[0].value).toFixed(4)}
+      <div style={{ background: 'rgba(13,31,53,0.95)', border: '1px solid rgba(26,58,92,0.8)', borderRadius: '8px', padding: '12px 16px' }}>
+        <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.8rem', color: '#00D4FF', marginBottom: '6px' }}>{label}</p>
+        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.85rem', color: '#E2E8F0', marginBottom: '2px' }}>
+          Cost: ${Number(payload[0].value).toFixed(4)}
         </p>
+        {d.evaluations != null && (
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.8rem', color: '#94A3B8' }}>
+            Evaluations: {d.evaluations}
+          </p>
+        )}
+        {d.tokens != null && (
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.8rem', color: '#94A3B8' }}>
+            Tokens: {d.tokens.toLocaleString()}
+          </p>
+        )}
       </div>
     );
   }
   return null;
 }
+
 
 // ── Main Page ─────────────────────────────────────────────────────
 export default function PlatformAdminPage() {
@@ -80,28 +92,53 @@ export default function PlatformAdminPage() {
         adminAPI.getTopExpensive(),
         adminAPI.getCompanies(),
       ]);
-      setSummary(sumRes.data);
 
-      const cuArr = Array.isArray(cuRes.data) ? cuRes.data : cuRes.data?.companies || [];
-      setCompanyUsage(cuArr);
+      // Usage summary — nested under "summary" key
+      const sumData = sumRes.data?.summary || sumRes.data || {};
+      setSummary({
+        total_evaluations:          sumData.total_evaluations_all_time      || 0,
+        total_cost_this_month:      sumData.total_cost_usd_this_month        || 0,
+        avg_cost_per_evaluation:    sumData.average_cost_per_evaluation_usd  || 0,
+        total_tokens:               sumData.total_tokens_used                || 0,
+        total_evaluations_month:    sumData.total_evaluations_this_month     || 0,
+      });
 
-      const mcArr = Array.isArray(mcRes.data) ? mcRes.data : mcRes.data?.months || [];
-      setMonthlyCost(mcArr.map(m => ({
-        month: m.month || m.period || '',
-        cost:  parseFloat(m.total_cost || m.cost || 0),
+      // Company usage — nested under "companies" key
+      const cuArr = cuRes.data?.companies || (Array.isArray(cuRes.data) ? cuRes.data : []);
+      setCompanyUsage(cuArr.map(c => ({
+        ...c,
+        total_tokens: c.total_tokens_used || c.total_tokens || 0,
+        total_cost:   c.total_cost_usd    || c.total_cost   || 0,
       })));
 
-      const teArr = Array.isArray(teRes.data) ? teRes.data : teRes.data?.evaluations || [];
-      setTopExpensive(teArr);
+      // Monthly cost — nested under "monthly_cost_trend" key
+      const mcArr = mcRes.data?.monthly_cost_trend || (Array.isArray(mcRes.data) ? mcRes.data : []);
+      setMonthlyCost(mcArr.map(m => ({
+        month:       m.month || m.period || '',
+        cost:        parseFloat(m.total_cost_usd || m.total_cost || 0),
+        evaluations: m.total_evaluations || 0,
+        tokens:      m.total_tokens_used || 0,
+      })));
 
-      const coArr = Array.isArray(coRes.data) ? coRes.data : coRes.data?.companies || [];
+      // Top expensive — nested under "top_expensive_evaluations" key
+      const teArr = teRes.data?.top_expensive_evaluations || (Array.isArray(teRes.data) ? teRes.data : []);
+      setTopExpensive(teArr.map(e => ({
+        ...e,
+        total_cost: e.total_cost_usd || e.total_cost || 0,
+      })));
+
+      // Companies list — nested under "companies" key
+      const coArr = coRes.data?.companies || (Array.isArray(coRes.data) ? coRes.data : []);
       setCompanies(coArr);
+
     } catch (err) {
+      console.error('Platform admin fetch error:', err);
       setError('Failed to load platform data. Make sure you are logged in as super_admin.');
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleDeactivate = async (companyId) => {
     try {
@@ -190,12 +227,13 @@ export default function PlatformAdminPage() {
       )}
 
       {/* ── Stat Cards ── */}
+      
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '28px' }}>
-        <StatCard icon={ClipboardList} label="Total Evaluations"    value={summary?.total_evaluations    || 0} color="#00D4FF" bg="rgba(0,212,255,0.1)"   border="rgba(0,212,255,0.2)"   />
-        <StatCard icon={Building2}     label="Total Companies"      value={companies.length              || 0} color="#3B82F6" bg="rgba(59,130,246,0.1)"  border="rgba(59,130,246,0.2)"  />
-        <StatCard icon={DollarSign}    label="Cost This Month"      value={formatCost(summary?.total_cost_this_month)} color="#10B981" bg="rgba(16,185,129,0.1)" border="rgba(16,185,129,0.2)" />
-        <StatCard icon={TrendingUp}    label="Avg Cost/Evaluation"  value={formatCost(summary?.avg_cost_per_evaluation)} color="#F59E0B" bg="rgba(245,158,11,0.1)" border="rgba(245,158,11,0.2)" />
-      </div>
+        <StatCard icon={ClipboardList} label="Total Evaluations (All Time)" value={summary?.total_evaluations        || 0}                              color="#00D4FF" bg="rgba(0,212,255,0.1)"   border="rgba(0,212,255,0.2)"   />
+        <StatCard icon={Building2}     label="Total Companies"              value={companies.length                  || 0}                              color="#3B82F6" bg="rgba(59,130,246,0.1)"  border="rgba(59,130,246,0.2)"  />
+        <StatCard icon={DollarSign}    label="Cost This Month"              value={formatCost(summary?.total_cost_this_month)}                          color="#10B981" bg="rgba(16,185,129,0.1)" border="rgba(16,185,129,0.2)" />
+        <StatCard icon={TrendingUp}    label="Avg Cost / Evaluation"        value={formatCost(summary?.avg_cost_per_evaluation)}                        color="#F59E0B" bg="rgba(245,158,11,0.1)" border="rgba(245,158,11,0.2)" />
+       </div>
 
       {/* ── Monthly Cost Chart ── */}
       <div className="glass-card" style={{ padding: '24px', marginBottom: '24px' }}>
@@ -254,7 +292,7 @@ export default function PlatformAdminPage() {
                   </td>
                   <td style={{ fontFamily: 'DM Sans, sans-serif', color: '#94A3B8' }}>{c.total_evaluations || 0}</td>
                   <td style={{ fontFamily: 'DM Sans, sans-serif', color: '#94A3B8' }}>{(c.total_tokens || 0).toLocaleString()}</td>
-                  <td style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, color: '#10B981' }}>{formatCost(c.total_cost)}</td>
+                  <td style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, color: '#10B981' }}>{formatCost(c.total_cost || c.total_cost_usd)}</td>
                 </tr>
               ))}
             </tbody>
@@ -291,7 +329,8 @@ export default function PlatformAdminPage() {
                     <td style={{ fontWeight: 500, color: '#E2E8F0', fontFamily: 'DM Sans, sans-serif' }}>{ev.supplier_name || '—'}</td>
                     <td style={{ color: '#94A3B8', fontFamily: 'DM Sans, sans-serif' }}>{ev.company_name || '—'}</td>
                     <td>{ev.risk_level ? <span className={riskCls}>{ev.risk_level}</span> : <span style={{ color: '#4A6080' }}>—</span>}</td>
-                    <td style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, color: '#F59E0B' }}>{formatCost(ev.total_cost)}</td>
+                    <td style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, color: '#F59E0B' }}>{formatCost(ev.total_cost || ev.total_cost_usd)}</td>
+            
                     <td style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.8rem', color: '#64748B' }}>{formatDate(ev.created_at)}</td>
                   </tr>
                 );
