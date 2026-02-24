@@ -1,253 +1,332 @@
 # 🧠 Agentic Supplier Risk Intelligence System
 
-## Production-Grade Multi-Tenant AI SaaS for Automated Supplier Risk Evaluation
+### Production-Grade Multi-Tenant AI SaaS for Automated Supplier Risk Evaluation
 
 ------------------------------------------------------------------------
 
 ## 🌍 Live Deployment
 
-Frontend (AWS S3 Static Hosting):\
+**Frontend (AWS S3 Static Hosting):**\
 http://agentic-supplier-risk-frontend-786.s3-website.ap-south-1.amazonaws.com/platform-admin
 
-Backend: AWS EC2 (Dockerized Infrastructure)
-
-Region: Asia Pacific (Mumbai) --- ap-south-1
-
-------------------------------------------------------------------------
-
-# 📑 TABLE OF CONTENTS
-
-1.  Executive Summary\
-2.  Problem Statement\
-3.  High-Level Architecture\
-4.  System Architecture Diagram\
-5.  Agentic Workflow Diagram\
-6.  MCP Tooling Architecture\
-7.  RAG System Design\
-8.  Database Architecture\
-9.  Backend Architecture\
-10. Frontend Architecture\
-11. RBAC & Multi-Tenancy\
-12. LLM Cost Governance\
-13. Security Architecture\
-14. Tech Stack (Versions Included)\
-15. Docker & AWS Deployment\
-16. Environment Configuration\
-17. Project Structure\
-18. Local Development Setup\
-19. End-to-End Evaluation Flow\
-20. Admin & Platform Controls\
-21. Engineering Trade-offs\
-22. Future Improvements\
-23. License & Disclaimer
+**Backend:** AWS EC2 (Dockerized Infrastructure)\
+**Region:** Asia Pacific (Mumbai) --- ap-south-1
 
 ------------------------------------------------------------------------
 
-# 🎯 Executive Summary
+# 📑 Table of Contents
 
-The Agentic Supplier Risk Intelligence System is a production-grade AI
-SaaS platform that automates international supplier due diligence.
-
-Traditional supplier verification takes 2--3 days of manual compliance
-review.\
-This system reduces that to approximately 10 minutes using:
-
-• 5 Specialized AI Agents\
-• LangGraph Orchestration\
-• Retrieval-Augmented Generation (RAG)\
-• Real Sanctions & Registry Data\
-• Structured Risk Reporting\
-• Full LLM Cost Tracking\
-• Multi-Tenant RBAC
-
-------------------------------------------------------------------------
-
-# ❗ Problem Statement
-
-Businesses engaging in international trade must verify:
-
-• Company legitimacy\
-• Regulatory compliance\
-• Financial consistency\
-• Sanctions exposure\
-• Public reputation
-
-Manual review is expensive, slow, and error-prone.
-
-This system automates the entire lifecycle with explainable AI
-reasoning.
-
-------------------------------------------------------------------------
-
-# 🏗 High-Level Architecture
-
-Frontend (React + Vite + Tailwind)\
-↓\
-FastAPI Backend (Docker on EC2)\
-↓\
-PostgreSQL \| Redis \| Qdrant \| MinIO
+-   [Executive Summary](#executive-summary)
+-   [Business Problem & Motivation](#business-problem--motivation)
+-   [System Vision & Objectives](#system-vision--objectives)
+-   [High-Level Architecture](#high-level-architecture)
+-   [Complete Infrastructure Diagram](#complete-infrastructure-diagram)
+-   [Agentic Workflow Orchestration](#agentic-workflow-orchestration)
+-   [Detailed Agent Architecture](#detailed-agent-architecture)
+-   [MCP Tooling Layer (Model Context
+    Protocol)](#mcp-tooling-layer-model-context-protocol)
+-   [RAG System Architecture](#rag-system-architecture)
+-   [Database Architecture (4
+    Databases)](#database-architecture-4-databases)
+-   [Backend Architecture (FastAPI
+    Layer)](#backend-architecture-fastapi-layer)
+-   [Frontend Architecture (React SaaS
+    UI)](#frontend-architecture-react-saas-ui)
+-   [Multi-Tenant RBAC Design](#multi-tenant-rbac-design)
+-   [LLM Cost Governance &
+    Observability](#llm-cost-governance--observability)
+-   [Security Architecture](#security-architecture)
+-   [Technology Stack (With Versions)](#technology-stack-with-versions)
+-   [Docker & Containerization
+    Strategy](#docker--containerization-strategy)
+-   [AWS Production Deployment](#aws-production-deployment)
+-   [Environment Configuration](#environment-configuration)
+-   [Project Structure](#project-structure)
+-   [Local Development Setup](#local-development-setup)
+-   [End-to-End Evaluation Lifecycle](#end-to-end-evaluation-lifecycle)
+-   [Admin Analytics & Platform
+    Controls](#admin-analytics--platform-controls)
+-   [Engineering Trade-offs & Design
+    Decisions](#engineering-trade-offs--design-decisions)
+-   [Future Improvements & Roadmap](#future-improvements--roadmap)
+-   [License & Disclaimer](#license--disclaimer)
 
 ------------------------------------------------------------------------
 
-# 🧩 System Architecture Diagram
+# Executive Summary
 
-                ┌────────────────────────────┐
-                │    React Frontend (S3)     │
-                └──────────────┬─────────────┘
-                               │ HTTP
-                               ▼
-                ┌────────────────────────────┐
-                │    FastAPI Backend (EC2)   │
-                └──────────────┬─────────────┘
-                               │
-        ┌──────────────┬───────┼────────┬──────────────┐
-        ▼              ▼       ▼        ▼              ▼
+The **Agentic Supplier Risk Intelligence System** is a production-grade,
+multi-tenant AI SaaS platform designed to automate international
+supplier due diligence.
 
-PostgreSQL Redis Qdrant MinIO LangGraph (Primary DB) (Cache) (Vector)
-(Storage) (Orchestration)
+Traditional supplier verification can take **2--3 days** of manual
+compliance review.\
+This system reduces the process to **\~10 minutes** using:
 
-------------------------------------------------------------------------
+-   5 Specialized AI Agents\
+-   LangGraph State Machine Orchestration\
+-   Retrieval-Augmented Generation (RAG)\
+-   Real Government Sanctions Data\
+-   Live Registry & News Intelligence\
+-   Structured Risk Assessment Reports\
+-   Full LLM Cost Tracking & Governance\
+-   Enterprise-Ready RBAC
 
-# 🤖 Agentic Workflow Diagram
-
-Planner Agent\
-↓\
-Document Intelligence Agent\
-↓\
-RAG Knowledge Agent\
-↓\
-External Intelligence Agent\
-↓\
-Decision & Report Agent\
-↓\
-Final Risk Assessment Stored in Database
+This is not a prototype --- it is architected as a **real SaaS
+product**.
 
 ------------------------------------------------------------------------
 
-# 🛠 MCP Tooling Architecture
+# Business Problem & Motivation
+
+Global trade involves serious risks:
+
+-   Fraudulent suppliers\
+-   Sanctioned entities\
+-   Fake export licenses\
+-   Financial inconsistencies\
+-   Regulatory non-compliance
+
+Compliance teams manually:
+
+-   Review PDFs\
+-   Cross-check registries\
+-   Search news reports\
+-   Verify sanctions\
+-   Confirm export compliance
+
+This process is expensive, slow, and error-prone.
+
+This platform automates the full lifecycle with explainable AI reasoning
+and audit trails.
+
+------------------------------------------------------------------------
+
+# System Vision & Objectives
+
+-   Build a production-ready AI SaaS platform
+-   Implement real-world multi-tenant architecture
+-   Track and govern AI costs
+-   Provide explainable risk reasoning
+-   Maintain enterprise-grade security
+-   Demonstrate senior-level systems engineering
+
+------------------------------------------------------------------------
+
+# High-Level Architecture
+
+    React Frontend (S3 Hosted)
+            │
+            ▼
+    FastAPI Backend (EC2 Docker)
+            │
+            ├── PostgreSQL (Primary DB)
+            ├── Redis (Rate Limiting + JWT Blacklist)
+            ├── Qdrant (Vector Database for RAG)
+            ├── MinIO (Document Storage)
+            └── LangGraph (Agent Orchestration Engine)
+
+------------------------------------------------------------------------
+
+# Complete Infrastructure Diagram
+
+                               ┌──────────────────────────┐
+                               │     React Frontend       │
+                               │   (AWS S3 Static Site)   │
+                               └─────────────┬────────────┘
+                                             │ HTTPS
+                                             ▼
+                               ┌──────────────────────────┐
+                               │     FastAPI Backend      │
+                               │      (EC2 + Docker)      │
+                               └─────────────┬────────────┘
+                                             │
+             ┌───────────────┬───────────────┼───────────────┬──────────────┐
+             ▼               ▼               ▼               ▼              ▼
+      PostgreSQL         Redis            Qdrant          MinIO        LangGraph
+     (Relational DB)   (Cache + Auth)   (Vector DB)   (Object Store) (State Engine)
+
+------------------------------------------------------------------------
+
+# Agentic Workflow Orchestration
+
+    Planner Agent
+          ↓
+    Document Intelligence Agent
+          ↓
+    RAG Knowledge Agent
+          ↓
+    External Intelligence Agent
+          ↓
+    Decision & Report Agent
+          ↓
+    Final Risk Assessment Stored in PostgreSQL
+
+Executed via LangGraph sequential state machine.
+
+------------------------------------------------------------------------
+
+# Detailed Agent Architecture
+
+### 1️⃣ Planner Agent
+
+-   Task decomposition
+-   No tool usage
+-   Structured JSON output
+
+### 2️⃣ Document Intelligence Agent
+
+-   Extracts data from PDFs
+-   Detects inconsistencies
+-   Flags missing documents
+
+### 3️⃣ RAG Knowledge Agent
+
+-   Retrieves internal compliance policies
+-   Uses 768-dim embeddings
+-   Provides citations & confidence
+
+### 4️⃣ External Intelligence Agent
+
+-   UK Companies House
+-   NewsAPI
+-   EU Sanctions
+-   OFAC Sanctions
+-   UN Sanctions
+
+### 5️⃣ Decision Agent
+
+-   Synthesizes all signals
+-   Outputs structured risk report
+
+------------------------------------------------------------------------
+
+# MCP Tooling Layer (Model Context Protocol)
 
 MCP separates reasoning from execution.
 
-Agent decides WHY.\
-Tool defines HOW.
-
-Tool Groups:
-
-MCP-1 → Document Tools\
-MCP-2 → News Intelligence\
-MCP-3 → Company Registry\
-MCP-4 → Sanctions & Watchlists
+  MCP Group   Purpose
+  ----------- ------------------------
+  MCP-1       Document Tools
+  MCP-2       News Intelligence
+  MCP-3       Company Registry
+  MCP-4       Sanctions & Watchlists
 
 ------------------------------------------------------------------------
 
-# 📚 RAG System Design
+# RAG System Architecture
 
-4 Compliance PDFs\
-↓\
-Chunking (\~700 tokens)\
-↓\
-HuggingFace all-mpnet-base-v2 (768-dim)\
-↓\
-Qdrant Vector Store\
-↓\
-Top-5 Semantic Retrieval\
-↓\
-LLM Synthesis with Citations
+    4 Compliance PDFs
+          ↓
+    Text Extraction
+          ↓
+    Chunking (~700 tokens)
+          ↓
+    HuggingFace all-mpnet-base-v2
+          ↓
+    768-dim Embeddings
+          ↓
+    Qdrant Collection: compliance_policies
+          ↓
+    Top-5 Retrieval
+          ↓
+    LLM Response with Citations
 
-Indexed Chunks: 619
-
-------------------------------------------------------------------------
-
-# 🗄 Database Architecture
-
-PostgreSQL (9 Tables) • companies\
-• users\
-• suppliers\
-• evaluations\
-• documents\
-• rag_documents\
-• api_keys\
-• notifications\
-• usage_tracking
-
-Redis • Rate limiting\
-• JWT blacklist\
-• RAG caching
-
-Qdrant • Vector DB (768-dim embeddings)
-
-MinIO • S3-compatible object storage
+Indexed Chunks: **619**
 
 ------------------------------------------------------------------------
 
-# 🧱 Backend Architecture
+# Database Architecture (4 Databases)
 
-FastAPI\
-• JWT Authentication\
-• RBAC Middleware\
-• Redis Rate Limiter\
-• Centralized LLMService\
-• LangGraph Orchestration\
-• Celery Background Tasks
+## PostgreSQL
+
+9 Tables: - companies - users - suppliers - evaluations - documents -
+rag_documents - api_keys - notifications - usage_tracking
+
+## Redis
+
+-   Rate limiting
+-   JWT blacklisting
+-   RAG caching
+
+## Qdrant
+
+-   Vector database
+-   Cosine similarity search
+
+## MinIO
+
+-   Stores uploaded supplier documents
 
 ------------------------------------------------------------------------
 
-# 🖥 Frontend Architecture
+# Backend Architecture (FastAPI Layer)
 
-React 18\
-Vite\
-Tailwind CSS\
-shadcn/ui\
-TanStack Query\
-Recharts\
-Framer Motion
+-   JWT Authentication
+-   Role-Based Middleware
+-   Redis Rate Limiter
+-   Centralized LLMService
+-   Celery Background Execution
+-   LangGraph Workflow Engine
+
+------------------------------------------------------------------------
+
+# Frontend Architecture (React SaaS UI)
+
+-   React 18
+-   Vite
+-   Tailwind CSS
+-   shadcn/ui
+-   TanStack Query
+-   Recharts
+-   Framer Motion
 
 10 Fully Implemented SaaS Pages.
 
 ------------------------------------------------------------------------
 
-# 🔐 RBAC & Multi-Tenant Design
+# Multi-Tenant RBAC Design
 
-Roles:
+  Role          Scope
+  ------------- --------------------
+  super_admin   Platform Owner
+  admin         Company Owner
+  analyst       Create Evaluations
+  viewer        Read Only
 
-super_admin → Platform Owner\
-admin → Company Owner\
-analyst → Create Evaluations\
-viewer → Read-only
-
-Super Admin is created manually in database (never via signup).
-
-------------------------------------------------------------------------
-
-# 💰 LLM Cost Governance
-
-All OpenAI calls routed via LLMService.
-
-Tracks: • Prompt tokens\
-• Completion tokens\
-• Total tokens\
-• Total cost\
-• Agent name\
-• Evaluation ID\
-• Company ID
-
-Stored in usage_tracking table.
+Super Admin created manually in database.
 
 ------------------------------------------------------------------------
 
-# 🔒 Security Architecture
+# LLM Cost Governance & Observability
 
-• JWT Authentication\
-• Redis Token Blacklisting\
-• bcrypt Password Hashing\
-• Rate Limiting\
-• Subscription Enforcement\
-• Docker Network Isolation\
-• Databases not publicly exposed
+Centralized LLMService tracks:
+
+-   Prompt tokens
+-   Completion tokens
+-   Total tokens
+-   Cost per call
+-   Agent name
+-   Evaluation ID
+-   Company ID
+
+Stored in `usage_tracking` table.
 
 ------------------------------------------------------------------------
 
-# 🧰 Tech Stack
+# Security Architecture
+
+-   JWT Authentication
+-   Redis Token Blacklisting
+-   bcrypt Password Hashing
+-   Rate Limiting
+-   Subscription Enforcement
+-   Docker Network Isolation
+-   Databases not publicly exposed
+
+------------------------------------------------------------------------
+
+# Technology Stack (With Versions)
 
 Python 3.10\
 FastAPI 0.115.6\
@@ -262,28 +341,38 @@ React 18
 
 ------------------------------------------------------------------------
 
-# 🐳 Docker & AWS Deployment
+# Docker & Containerization Strategy
 
-EC2 (m7i-flex.large)\
-Docker Compose\
-Internal bridge network\
-All services containerized
-
-Frontend deployed on AWS S3 static hosting.
+-   Full Docker Compose deployment
+-   Internal bridge networking
+-   No localhost dependencies
+-   Environment-driven configuration
+-   Restart policies enabled
 
 ------------------------------------------------------------------------
 
-# ⚙ Environment Variables Example
+# AWS Production Deployment
+
+Backend: - EC2 (m7i-flex.large) - Docker Compose
+
+Frontend: - AWS S3 Static Hosting
+
+Security Groups: - 8000 open - Databases restricted
+
+------------------------------------------------------------------------
+
+# Environment Configuration
+
+Example:
 
 DATABASE_URL=postgresql://user:pass@postgres:5432/db\
 REDIS_URL=redis://:password@redis:6379\
 QDRANT_HOST=qdrant\
-MINIO_ENDPOINT=minio:9000\
-ENVIRONMENT=production
+MINIO_ENDPOINT=minio:9000
 
 ------------------------------------------------------------------------
 
-# 📁 Project Structure
+# Project Structure
 
 AGENTIC_SUPPLIER_RISK_AI/ ├── agents/ ├── api/ ├── data/ ├── mcp_tools/
 ├── rag/ ├── workflows/ ├── frontend/ ├── docker-compose.yml ├──
@@ -291,7 +380,7 @@ requirements.txt └── README.md
 
 ------------------------------------------------------------------------
 
-# 🚀 Local Development
+# Local Development Setup
 
 docker-compose up -d\
 uvicorn api.main:app --reload\
@@ -300,12 +389,12 @@ npm run dev
 
 ------------------------------------------------------------------------
 
-# 🔄 Evaluation Flow
+# End-to-End Evaluation Lifecycle
 
 1.  Supplier Created\
 2.  Documents Uploaded\
 3.  Evaluation Triggered\
-4.  5 Agents Execute Sequentially\
+4.  Agents Execute Sequentially\
 5.  Decision Generated\
 6.  Stored in DB\
 7.  Email Sent\
@@ -313,36 +402,36 @@ npm run dev
 
 ------------------------------------------------------------------------
 
-# 📊 Admin & Platform Controls
+# Admin Analytics & Platform Controls
 
-• Usage Summary\
-• Monthly Cost Analytics\
-• Company Deactivation\
-• Permanent Delete (GDPR)\
-• Top Expensive Evaluations
-
-------------------------------------------------------------------------
-
-# ⚖ Engineering Trade-offs
-
-HuggingFace over OpenAI embeddings → Cost optimization\
-Qdrant over FAISS → Persistence\
-Manual super_admin → Security\
-Redis fail-open → Availability
+-   Usage Summary
+-   Monthly Cost Trends
+-   Company Deactivation
+-   GDPR Permanent Delete
+-   Top Expensive Evaluations
 
 ------------------------------------------------------------------------
 
-# 🔮 Future Improvements
+# Engineering Trade-offs & Design Decisions
 
-• HTTPS via Nginx\
-• CloudFront CDN\
-• CI/CD Pipeline\
-• Auto DB Backup\
-• Multi-region deployment
+-   HuggingFace over OpenAI embeddings → Cost optimization
+-   Qdrant over FAISS → Persistence
+-   Manual super_admin creation → Security
+-   Redis fail-open → Availability
 
 ------------------------------------------------------------------------
 
-# 📜 License & Disclaimer
+# Future Improvements & Roadmap
+
+-   HTTPS via Nginx
+-   CloudFront CDN
+-   CI/CD pipeline
+-   Automated backups
+-   Multi-region support
+
+------------------------------------------------------------------------
+
+# License & Disclaimer
 
 Portfolio Engineering Project.\
 Provides decision-support only.\
